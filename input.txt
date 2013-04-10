@@ -1,0 +1,103 @@
+#comment
+output test.png
+outsize 512 512
+origin -5 -5 8
+eye 0 0 15
+horiz 10 0 0
+vert 0 10 0
+
+#assign names to colors
+color green 0 1 0
+color white 1 1 1
+color blue 0 0 0.8
+color red 1 0 0 
+color clear 0 0 0
+color mirror 1 1 1
+
+background 0 0 0 
+
+#define color by name
+mat amb green
+mat diff green
+local 1.0
+reflect 0.2
+transmit 0 0
+#define color by rgb
+mat spec 1 1 1
+
+#store current material by name
+mat save green
+
+#define color by name
+#mat amb clear
+#mat diff clear
+#local 0.1
+#reflect 0.05
+#transmit 0 0
+#mat spec 1 1 1
+#mat save clear
+
+#define color by name
+#mat amb mirror
+#mat diff mirror
+#local .5
+#reflect 1.0
+#transmit 0.0 0.0
+#mat spec 1 1 1
+#mat save mirror
+
+mat amb blue
+mat diff blue
+local .6
+reflect 1.0
+transmit 0.0 0.0
+mat save blue
+
+mat amb red
+mat diff red
+mat spec 0 1 1
+local 1.0
+reflect 0.0
+transmit 0.0 0.0
+mat save red
+
+#load saved material as current
+mat load green
+
+#center x,y,z radius
+#material set to current material
+sphere 0 0 0 2
+
+#mat load clear
+#sphere 0 5 0 2
+
+mat load red
+sphere 4 0 0 1
+sphere 0 5 0 3
+
+#mat load mirror
+#floor
+#rectangle -15 -5.1 15.1   15 -5.1 15.1  15 -5.1 -10
+#left wall
+#rectangle -15 -5.1 15.1   -15 10 15.1  -15 10 -10
+#back wall
+#rectangle 15 10 15.1    15 10 15.1   -15 -5.1 15.1
+#left wall
+#rectangle 15 -5.1 15.1   15 10 15.1  15 10 -10
+#front wall
+#rectangle -15 -5.1 -10   15 10 -10  15 10 -10
+#ceiling
+rectangle -15 10 15.1   15 10 15.1  15 10 -10
+
+
+mat load blue #eol comment
+#xyz of ll, lr, ur
+rectangle -5 -5 5  5 -5 5  5 -5 -5
+
+#global ambient
+amblight 0.1
+
+#xyz pos intensity
+light 0 3 10 0.3 
+light -5 0 0 0.3
+light 5 8 0 0.3
