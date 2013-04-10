@@ -1,5 +1,26 @@
+cmake_minimum_required(VERSION 2.8.0)
+set(CMAKE_CXX_FLAGS "-g -Wall")
+set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules) #for FindGLEW.cmake
+
+FIND_PACKAGE(Qt4 REQUIRED) #for window widgets
+
+
+#find PNG include directories/libraries
+#/usr/share/cmake-2.8/Modules/FindPNG.cmake
+find_package(PNG REQUIRED)
+
 include_directories(PNG_INCLUDE_DIR)
 find_package(PNG REQUIRED)
+
+#required CMake options for QT Apps
+INCLUDE(${QT_USE_FILE})
+ADD_DEFINITIONS(${QT_DEFINITIONS})
+
+SET(EXT_LIBS ${QT_LIBRARIES} )
+
+#get symlink_data macro
+include(${CMAKE_SOURCE_DIR}/cmake_modules/helpers.cmake)
+
 
 set(HDRS common.h png_reader.h png_writer.h
   rgbColor.h rgbImage.h ray.h shape.h 
