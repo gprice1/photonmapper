@@ -12,6 +12,7 @@ class Photon{
 
 public:
     //go ahead and mess with these directly, they are public
+    vec3 origin;
     vec3 direction;  //a vector
     vec3 color;      // the color
 

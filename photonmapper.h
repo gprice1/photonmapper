@@ -25,7 +25,7 @@ public:
 
     ~PhotonMapper();
 
-    mapScene( Scene &scene );
+    void mapScene( Scene &scene );
     
 private:
 

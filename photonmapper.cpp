@@ -32,7 +32,7 @@ PhotonMapper::~PhotonMapper(){
  //get rid of stuff   
 }
 
-PhotonMapper::mapScene( Scene &scene ){
+void PhotonMapper::mapScene( Scene &scene ){
     float theta, phi;
     vec3 direction; // euclidean form of theta, phi
 
