@@ -2,12 +2,9 @@ cmake_minimum_required(VERSION 2.8.0)
 set(CMAKE_CXX_FLAGS "-g -Wall")
 set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules) #for FindGLEW.cmake
 
+FIND_PACKAGE(OpenGL REQUIRED) #for graphics
 FIND_PACKAGE(Qt4 REQUIRED) #for window widgets
-
-
-#find PNG include directories/libraries
-#/usr/share/cmake-2.8/Modules/FindPNG.cmake
-find_package(PNG REQUIRED)
+FIND_PACKAGE(GLEW REQUIRED)
 
 include_directories(PNG_INCLUDE_DIR)
 find_package(PNG REQUIRED)
@@ -16,7 +13,7 @@ find_package(PNG REQUIRED)
 INCLUDE(${QT_USE_FILE})
 ADD_DEFINITIONS(${QT_DEFINITIONS})
 
-SET(EXT_LIBS ${QT_LIBRARIES} )
+SET(EXT_LIBS ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${GLEW_LIBRARY} )
 
 #get symlink_data macro
 include(${CMAKE_SOURCE_DIR}/cmake_modules/helpers.cmake)
@@ -52,6 +49,5 @@ add_executable(makescene ${HDRS} makescene.cpp)
 set(ALLLIBS rtrace ${EXT_LIBS} ${PNG_LIBRARIES})
 target_link_libraries(makescene ${ALLLIBS})
 
-symlink_data(raytracer *.txt)
-symlink_data(raytracer *.obj)
+symlink_data(raytracer *.txt *.obj)
 
