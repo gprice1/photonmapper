@@ -9,6 +9,7 @@
 #include "material.h"
 #include "rgbColor.h"
 #include "rgbImage.h"
+#include "photonmapper.h"
 
 namespace cs40{
 
@@ -32,6 +33,7 @@ private:
     cs40::Scene m_scene;
     QHash<QString, vec3> m_colors;
     int maxDepth;
+    PhotonMapper p_map;
 
     /* Hash table mapping material names to material structs.
      * materials["current_"] is a special entry refering to the
@@ -83,7 +85,7 @@ private:
 
     void loadModel( char * objectFile );
     
-
+    void getPhotonMap();
 
 };
 

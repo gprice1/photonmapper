@@ -63,6 +63,10 @@ RayTracer::~RayTracer(){
  */
 void RayTracer::trace(RGBImage & img){
 
+    cout << "Starting Photon Mapping " << endl;
+    getPhotonMap();
+    cout << "Finished Photon Mapping" << endl;
+
     for ( float i = 0.0; i < m_scene.view.ncols; i += 1.0 ){
       for ( float j = 0.0; j < m_scene.view.nrows; j += 1.0 ){
 
@@ -138,7 +142,7 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
   reflectedLight  *= collidedObject->material.reflection;
   transmittedLight *= collidedObject->material.transmission;
 
-  return local + reflectedLight + transmittedLight;
+  return p_map.getIllumination( hitPoint );//local + reflectedLight + transmittedLight;
 }
 
 /* checkIntersection -  Checks an incident ray for intersection with all of the shapes in the scene.
@@ -184,14 +188,6 @@ float RayTracer::collisionTime(const Ray & incidentRay, int shapeIndex ){
   for ( int i = 0 ; i < m_scene.objects.size(); i ++ ){
     if ( i == shapeIndex ){ continue; }
 
-    // objects with a high transmission are clear, so
-    // they will let light pass through
-    // for more completeness, we should find the transmission
-    // angle through the material and support colored see-through
-    // material
-    if ( m_scene.objects[i]->material.transmission >= 0.8){
-        continue;
-    }
 
     currentTime = m_scene.objects[i]->hitTime( incidentRay );
     if ( currentTime < minTime && currentTime > 0.0 ){
@@ -509,6 +505,13 @@ void RayTracer::parseMat(const vector<string>& words){
 }
 
 
+void RayTracer::getPhotonMap(){
+    p_map.mapScene( m_scene );
+
+}
+
+
+
 void RayTracer::loadModel( char * objectFile )
 {
     GLMmodel *objmodel_ptr;
@@ -526,6 +529,7 @@ void RayTracer::loadModel( char * objectFile )
     glmFacetNormals(objmodel_ptr);
     glmVertexNormals(objmodel_ptr, 90.0);
 }
+
 /*After this code is executed, the model will have been loaded, 
  * normals will have been created and smoothed, and the model will be
  *  ready to render. To draw the loaded model, add the following code

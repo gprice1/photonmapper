@@ -19,21 +19,25 @@ SET(EXT_LIBS ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${GLEW_LIBRARY} )
 #get symlink_data macro
 include(${CMAKE_SOURCE_DIR}/cmake_modules/helpers.cmake)
 
-#add_subdirectory( data )
-add_subdirectory( png )
-add_subdirectory( geom )
-add_subdirectory( parse )
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} . geom kdtree png )
 
-#INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} . )
-#include_directories( ./geom/ ./kdtree/ ./png/ ./parse/ )
 
-set( DIREC png kdtree geom parse )
-include_directories( ${DIREC} )
-link_directories( ${DIREC} )
+set(HDRS common.h png_reader.h png_writer.h
+  rgbColor.h rgbImage.h ray.h shape.h 
+  material.h view.h light.h
+  parser.h raytracer.h
+  sphere.h rectangle.h triangle.h scene.h
+  photon.h glm.h
+  feature_vector.h indirect_heap.h k-heap.h k-vector.h kd-tree.h
+  kd-tree_sse_24d.h
+)
 
-set(HDRS  raytracer.h photonmapper.h)
-
-set(LIBSRCS raytracer.cpp photonmapper.cpp)
+set(LIBSRCS common.cpp png_reader.cpp png_writer.cpp rgbImage.cpp
+  ray.cpp parser.cpp raytracer.cpp sphere.cpp rectangle.cpp triangle.cpp
+  photon.cpp glm.cpp
+  feature_vector.cpp indirect_heap.cpp k-heap.cpp k-vector.cpp kd-tree.cpp
+  kd-tree_io.cpp speed_kdtree.cpp test_kdtree.cpp
+)
    
 add_library(rtrace ${HDRS} ${LIBSRCS})
 
@@ -42,15 +46,11 @@ add_library(rtrace ${HDRS} ${LIBSRCS})
 #  rectangle.h rectangle.cpp
 #  triangle.h triangle.cpp
 
-SET(MYLIBS ${EXT_LIBS} )
+
 add_executable(makescene ${HDRS} makescene.cpp)
 
-#include_directories( ${DIREC} )
-#link_directories( ${DIREC} )
-
-set(ALLLIBS rtrace ${EXT_LIBS} ${PNG_LIBRARIES} geom_lib parse_lib
-                                                 png_lib)
+set(ALLLIBS rtrace ${EXT_LIBS} ${PNG_LIBRARIES})
 target_link_libraries(makescene ${ALLLIBS})
 
-symlink_data(raytracer *.txt)
+symlink_data(raytracer *.txt *.obj)
 

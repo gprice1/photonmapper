@@ -1,0 +1,6 @@
+/Users/templeprice/Desktop/programming/cs/photonmapper/kdtree/geom/CMakeFiles/geom_lib.dir
+/Users/templeprice/Desktop/programming/cs/photonmapper/kdtree/CMakeFiles/makescene.dir
+/Users/templeprice/Desktop/programming/cs/photonmapper/kdtree/parse/CMakeFiles/parse_lib.dir
+/Users/templeprice/Desktop/programming/cs/photonmapper/kdtree/png/CMakeFiles/png_lib.dir
+/Users/templeprice/Desktop/programming/cs/photonmapper/kdtree/CMakeFiles/raytracer.dir
+/Users/templeprice/Desktop/programming/cs/photonmapper/kdtree/CMakeFiles/rtrace.dir

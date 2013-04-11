@@ -77,15 +77,15 @@ sphere 0 5 0 3
 
 #mat load mirror
 #floor
-#rectangle -15 -5.1 15.1   15 -5.1 15.1  15 -5.1 -10
+rectangle -15 -5.1 15.1   15 -5.1 15.1  15 -5.1 -10
 #left wall
-#rectangle -15 -5.1 15.1   -15 10 15.1  -15 10 -10
+rectangle -15 -5.1 15.1   -15 10 15.1  -15 10 -10
 #back wall
-#rectangle 15 10 15.1    15 10 15.1   -15 -5.1 15.1
+rectangle 15 10 15.1    15 10 15.1   -15 -5.1 15.1
 #left wall
-#rectangle 15 -5.1 15.1   15 10 15.1  15 10 -10
+rectangle 15 -5.1 15.1   15 10 15.1  15 10 -10
 #front wall
-#rectangle -15 -5.1 -10   15 10 -10  15 10 -10
+rectangle -15 -5.1 -10   15 10 -10  15 10 -10
 #ceiling
 rectangle -15 10 15.1   15 10 15.1  15 10 -10
 

@@ -1,0 +1,2 @@
+/usr/bin/ar cr librtrace.a  CMakeFiles/rtrace.dir/raytracer.cpp.o CMakeFiles/rtrace.dir/photonmapper.cpp.o
+/usr/bin/ranlib librtrace.a
