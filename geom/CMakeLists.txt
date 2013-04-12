@@ -4,7 +4,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} .
 set(HDRS  common.h ray.h shape.h 
   material.h view.h light.h
   sphere.h rectangle.h triangle.h scene.h
-  photon.h
+  photon.h functions.h
 )
 
 set(LIBSRCS common.cpp   ray.cpp 

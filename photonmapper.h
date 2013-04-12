@@ -28,16 +28,23 @@ public:
 
     void mapScene( Scene &scene );
 
-    bool checkIntersection( Photon * photon,
-                             vec3 & origin,
-                             Scene & scene );
+    //bool checkIntersection( Photon * photon,
+    //                         vec3 & origin,
+    //                         Scene & scene );
 
     vec3 getIllumination( vec3 & point );
     
 private:
 
 //_________________________Private Variables__________________________________
-    //typedef kd_tree< float , 3 > KDTree;
+    void tracePhoton(const cs40::Scene & scene , cs40::Ray & incidentRay,
+                     const vec3 & incidentColor);
+
+    void addIndirect( const vec3 & direction, const vec3 & hitPoint,
+                    const vec3 & incidentColor );
+
+    void addCaustic( const vec3 & direction, const vec3 & hitPoint,
+                     const vec3 & incidentColor );
 
     KDTree indirect_tree;
     KDTree caustic_tree;
@@ -53,7 +60,8 @@ private:
     vector< Photon * > indirect_photons;
     vector< Photon * > caustic_photons;
 
-    int total_photons, current_photons;
+    int total_indirect, total_caustic;
+    int current_indirect, current_caustic;
     float epsilon;
 
 

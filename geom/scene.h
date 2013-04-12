@@ -5,16 +5,26 @@
 #include "light.h"
 #include "shape.h"
 #include <vector>
+#include "ray.h"
 
 namespace cs40{
 
 //A little struct to store everything to raytrace
-typedef struct scene_s{
+class Scene{
+
+public:
     cs40::View view;
     float ambient;           //global ambient intensity
     std::vector<cs40::Light> lights;    //other positional lights
     std::vector<cs40::Shape*> objects;  //things to raytrace
-} Scene;
+
+    int checkIntersection( const cs40::Ray & incidentRay, 
+                           int shapeIndex, 
+                           vec3 & hitPoint ) const;
+
+    float collisionTime(const cs40::Ray & incidentRay, int shapeIndex );
+
+};
 
 }
 

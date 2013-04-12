@@ -14,6 +14,13 @@ typedef struct mat_s{
     float reflection;
     float transmission;
     float refractionIndex;
+
+    //this controls the diffuse/specular continuum
+    float alpha;
+
+    //this controls the anisotropic/isotropic continuum
+    float beta;
+
 } Material;
 
 } //namespace

@@ -459,6 +459,15 @@ void RayTracer::parseLine(const vector<string>& words){
         m_materials["current_"].local = parseFloat( words[1]);
 
     }
+    else if ( cmd == "alpha"){
+        checksize( words, 1);
+        m_materials["current_"].alpha = parseFloat(words[1]);
+    }
+    else if ( cmd == "beta"){
+        checksize( words, 1);
+        m_materials["current_"].beta = parseFloat(words[1]);
+    }
+
     else{
         throw parser_error("Unknown command: "+cmd);
     }
