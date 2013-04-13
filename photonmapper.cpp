@@ -2,6 +2,7 @@
 #include <sstream>
 #include <math.h>
 #include "functions.h"
+#include "common.h"
 
 using std::rand;
 using std::string;
@@ -13,27 +14,26 @@ using cs40::Scene;
 using cs40::Ray;
 
 PhotonMapper::PhotonMapper( ){
-    total_indirect = 1000;
+    total_indirect = 10000;
     total_caustic  = 0;
     indirect_positions = new KDTree::kd_point[ total_indirect ];
     //caustic_positions = new KDTree::kd_point[ total_caustic ];
     epsilon = 0.0f;
     current_indirect = 0;
     current_caustic  = 0;
+    N = 2;
 }
 
 PhotonMapper::PhotonMapper( int num_photons ){
-    total_photons = num_photons;
-    indirect_positions = new KDTree::kd_point[ total_photons ];
+    total_indirect = num_photons;
+    indirect_positions = new KDTree::kd_point[ total_indirect ];
     epsilon = 0.0f;
-    current_photons = 0;
 }
 
 PhotonMapper::PhotonMapper( int num_photons, float e ){
-    total_photons = num_photons;
-    indirect_positions = new KDTree::kd_point[ total_photons ];     
+    total_indirect = num_photons;
+    indirect_positions = new KDTree::kd_point[ total_indirect ];     
     epsilon = e;
-    current_photons = 0;
 }
 
 
@@ -46,12 +46,11 @@ PhotonMapper::~PhotonMapper(){
 
 void PhotonMapper::mapScene( const Scene &scene ){
     float theta, phi;
-    Photon * photon; // euclidean form of theta, phi
     vec3 direction;
 
-    while ( current_photons < total_photons ){
-        if ( current_photons % 10000 == 0 ){
-            std::cout << "photon number: " << current_photons << std::endl;
+    while ( current_indirect < total_indirect ){
+        if ( current_indirect % 10000 == 0 ){
+            std::cout << "photon number: " << current_indirect << std::endl;
         }
         //std::cout << "shooting photon: " << current_photons << std::endl;
         //shoots a random ray out from a point in any direction.
@@ -70,7 +69,7 @@ void PhotonMapper::mapScene( const Scene &scene ){
 
     //this makes sure that the correct total gets set at the end.
     if ( total_indirect != current_indirect){
-        std::cout << "total_photons is not equal to current photons"<< std::endl;
+        std::cout << "total_indirect is not equal to current photons"<< std::endl;
         exit( 1 );
     }
     
@@ -98,7 +97,7 @@ void PhotonMapper::tracePhoton(const Scene &scene , Ray & incidentRay,
     //photons only stick on diffuse surfaces, so the higher the alpha, the
     //higher the likelihood the photon will stick.
     if ( mat.alpha > randVal ){
-        addPhoton( incidentRay.direction, hitPoint, incidentColor );
+        addIndirect( incidentRay.direction, hitPoint, incidentColor );
     }
 
     //the photon will either be reflected or absorbed
@@ -127,11 +126,11 @@ void PhotonMapper::tracePhoton(const Scene &scene , Ray & incidentRay,
     //If the material is refractive, then it calculates the fresnel equation
     //to see how much light is refracted vs reflected. 
     if ( mat.refractionIndex != 0 &&
-         cs40::fresnel(incidentRay, normal, n1, n2 ) <
+         cs40::fresnel(incidentRay.direction, normal, n1, n2 ) <
          (float)rand()/(float)RAND_MAX ){
 
         //the light is refracted
-        incidentRay.direction = transmit( incidentRay, normal,
+        incidentRay.direction = cs40::transmit( incidentRay.direction, normal,
                                           n1, n2 );
         incidentRay.origin = hitPoint;
         incidentRay.isInsideObject = !( incidentRay.isInsideObject );
@@ -140,9 +139,10 @@ void PhotonMapper::tracePhoton(const Scene &scene , Ray & incidentRay,
     //the photon is reflected
     else{
 
-        incidentRay.direction = reflect( incidentRay, normal);
+        incidentRay.direction = cs40::reflect( incidentRay.direction, normal);
         incidentRay.origin = hitPoint;
         tracePhoton( scene, incidentRay, incidentColor * mat.specular );
+    }
 }
 
 
@@ -196,19 +196,35 @@ bool PhotonMapper::checkIntersection( Photon * photon,
 */
 //TODO make this do the correct thing;
 //returns a color value that will be added in as something
-vec3 PhotonMapper::getIllumination( vec3 & point ){
+vec3 PhotonMapper::getIllumination( const vec3 & point,
+                                    const vec3 & incident,
+                                    const vec3 & normal,
+                                    const Material & mat ){
+
     KDTree::kd_point p = vec3_to_kdPoint( point );
     
     std::vector<KDTree::kd_neighbour> neighbours;
         
-    indirect_tree.knn( p , 1 , neighbours, epsilon );
-    if ( neighbours[0].squared_distance > 0.05 ){
-        return vec3( 0 , 0 , 0);
-    }
-    std::cout << "photon hit " << std::endl;
+    indirect_tree.knn( p , N , neighbours, epsilon );
 
-    int index = neighbors[0].index;
-    return indirect_photons[ index ]->color;
+    vec3 color;
+    int currentIndex;
+    Photon * currentPhoton;
+    float brdfVal;
+
+    for ( int i = 0; i < neighbours.size() ; i ++){
+        currentIndex = neighbours[i].index;
+        currentPhoton = indirect_photons[ currentIndex ];
+        brdfVal = cs40::brdf( mat.alpha, mat.beta, currentPhoton->direction,
+                                                   incident, 
+                                                   normal );
+        std::cout << "\tBRDF: " << brdfVal << std::endl;
+        color += currentPhoton->color * brdfVal; //  / neighbours[i].squared_distance;
+    }
+    std::cout << "color: " << color << std::endl ;
+    
+
+    return color;
 
 }
 
@@ -224,18 +240,18 @@ void PhotonMapper::addIndirect( const vec3 & direction, const vec3 & hitPoint,
     Photon * photon = new Photon( direction, incidentColor );
     indirect_photons.push_back( photon );
 
-    indirect_positions[ current_photons ] = incidentColor;
+    indirect_positions[ current_indirect ] = vec3_to_kdPoint( hitPoint );
         
 }
 
-void addCaustic( const vec3 & direction, const vec3 & hitPoint,
+void PhotonMapper::addCaustic( const vec3 & direction, const vec3 & hitPoint,
                      const vec3 & incidentColor ){
 
     std::cout << "addCaustic is unimlpemented " << std::endl;
 }
 
 
-inline KDTree::kd_point vec3_to_kdPoint( const vec3 & vector ){
+inline KDTree::kd_point PhotonMapper::vec3_to_kdPoint( const vec3 & vector ){
     KDTree::kd_point p;
     p[0] = vector.x();
     p[1] = vector.y();

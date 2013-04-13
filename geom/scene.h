@@ -13,6 +13,9 @@ namespace cs40{
 class Scene{
 
 public:
+    Scene(){}
+    ~Scene(){}
+
     cs40::View view;
     float ambient;           //global ambient intensity
     std::vector<cs40::Light> lights;    //other positional lights
@@ -22,7 +25,7 @@ public:
                            int shapeIndex, 
                            vec3 & hitPoint ) const;
 
-    float collisionTime(const cs40::Ray & incidentRay, int shapeIndex );
+    float collisionTime(const cs40::Ray & incidentRay, int shapeIndex ) const;
 
 };
 

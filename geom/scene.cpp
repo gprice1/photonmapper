@@ -1,7 +1,9 @@
 #include "scene.h"
+
 using cs40::Ray;
 using cs40::Shape;
 using cs40::Light;
+using cs40::Scene;
 
 /* checkIntersection -  Checks an incident ray for intersection with all of 
  * the shapes in the scene.
@@ -12,11 +14,12 @@ using cs40::Light;
  *  Returns an int corresponding to the index of the closest intersected object
  *  Returns -1 if there is no intersection.
  */
+
 int Scene::checkIntersection( const Ray & incidentRay, 
-                              int shapeIndex 
-                              vec3 & hitPoint ){
+                              int shapeIndex, 
+                              vec3 & hitPoint ) const{
   float currentTime , minTime;
-  minTime = INFINITY;
+  minTime = std::numeric_limits<float>::infinity();
   int minIndex = -2;
 
   for ( int i = 0 ; i < objects.size(); i ++ ){
@@ -38,9 +41,9 @@ int Scene::checkIntersection( const Ray & incidentRay,
 }
 
 
-float Scene::collisionTime(const Ray & incidentRay, int shapeIndex ){
+float Scene::collisionTime(const Ray & incidentRay, int shapeIndex ) const{
   float currentTime , minTime;
-  minTime = INFINITY;
+  minTime = std::numeric_limits<float>::infinity();
 
   //check all of the intersection times for the shapes
   for ( int i = 0 ; i < objects.size(); i ++ ){

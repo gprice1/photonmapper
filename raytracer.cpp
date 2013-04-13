@@ -142,7 +142,8 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
   reflectedLight  *= collidedObject->material.reflection;
   transmittedLight *= collidedObject->material.transmission;
 
-  return p_map.getIllumination( hitPoint );//local + reflectedLight + transmittedLight;
+  return p_map.getIllumination( hitPoint, incidentRay.direction, normal,
+                                collidedObject->material );//local + reflectedLight + transmittedLight;
 }
 
 /* checkIntersection -  Checks an incident ray for intersection with all of the shapes in the scene.
