@@ -33,8 +33,7 @@ inline vec3 transmit( const vec3 & direction, const vec3 & normal,
     //it did not seem worth it to render such a quickly decaying
     //emission, so we return an invalid direction.
     if ( cosTheta2Sqrd < 0 ){
-        float inf = std::numeric_limits<float>::infinity();
-        transmission = vec3( inf , inf , inf);
+        transmission = vec3( INFINITY , INFINITY , INFINITY);
         return transmission;
     }
 
