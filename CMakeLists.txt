@@ -31,7 +31,7 @@ set( DIREC png kdtree geom parse )
 include_directories( ${DIREC} )
 link_directories( ${DIREC} )
 
-set(HDRS  raytracer.h photonmapper.h)
+set(HDRS  raytracer.h photonmapper.h functions.h )
 
 set(LIBSRCS raytracer.cpp photonmapper.cpp)
    
