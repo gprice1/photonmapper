@@ -154,46 +154,6 @@ void PhotonMapper::build(){
     
 }
 
-/*
-//TODO I may need to set somthing about not using the current test for collision
-//detection
-//this function returns false if no collision occurred
-//this should input the origin of the light and the scene.
-bool PhotonMapper::checkIntersection( Photon * photon, 
-                                      vec3 & origin,
-                                      Scene & scene ){
-    float currentTime , minTime;
-    minTime = INFINITY;
-    
-    KDTree::kd_point point;
-    
-    Ray incidentRay;
-    incidentRay.direction = (*photon).direction;
-    incidentRay.origin = origin;
-    for ( int i = 0 ; i < scene.objects.size(); i ++ ){
-
-        currentTime = scene.objects[i]->hitTime( incidentRay );
-        //std::cout << "current Time: " << currentTime << std::endl;
-        //std::cout << "direction: " << incidentRay.direction << std::endl;
-        
-        if ( (currentTime < minTime ) && ( currentTime > 0 )){
-            minTime = currentTime;
-        }
-    }
-
-    if ( minTime != INFINITY ){
-        vec3 hitpoint = incidentRay( minTime );
-        indirect_positions[ current_photons ][0] = hitpoint.x();
-        indirect_positions[ current_photons ][1] = hitpoint.y();
-        indirect_positions[ current_photons ][2] = hitpoint.z();
-
-        current_photons ++ ;
-        return true;
-    }
-    
-    return false;
-}
-*/
 //TODO make this do the correct thing;
 //returns a color value that will be added in as something
 vec3 PhotonMapper::getIllumination( const vec3 & point,

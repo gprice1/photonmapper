@@ -20,6 +20,7 @@ background 0 0 0
 mat amb green
 mat diff green
 alpha 0.5
+beta 0.5
 local 1.0
 reflect 0.2
 transmit 0 0
@@ -51,6 +52,7 @@ mat amb blue
 mat diff blue
 local .6
 alpha 0.5
+beta 0.5
 reflect 1.0
 transmit 0.0 0.0
 mat save blue
@@ -60,6 +62,8 @@ mat diff red
 mat spec 0 1 1
 local 1.0
 alpha 0.5
+beta 0.5
+
 reflect 0.0
 transmit 0.0 0.0
 mat save red

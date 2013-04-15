@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include "scene.h"
+
 using std::vector;
 
 typedef kd_tree< float , 3 > KDTree;

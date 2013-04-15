@@ -59,32 +59,28 @@ inline vec3 transmit( const vec3 & direction, const vec3 & normal,
 //There may also be sign errors in the incoming vector.
 //The incoming light should be from a photon
 //the outgoing light is heading to the viewer.
-inline float brdf(float alpha, float beta, const vec3 & in,
+inline float brdfSchlick(float alpha, float beta, const vec3 & in,
                                     const vec3 & out,
-                                    const vec3 & normal ){
+                                    const vec3 & n ){
     vec3 outgoing = - out;
     vec3 incoming = - in;
+    vec3 normal = n;
 
     outgoing.normalize();
     incoming.normalize();
+    normal.normalize();
 
     float v1 = normal.dotProduct( normal, outgoing ) ;
     float v2 = normal.dotProduct( normal, incoming ) ;
 
     vec3 H = (outgoing + incoming).normalized() ;
-    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ) 
-                 ).normalized();
-    
+    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
+    H_bar.normalize();
+
     vec3 T = outgoing.crossProduct( normal ,
-             outgoing.crossProduct( outgoing , normal ) ).normalized();
+             outgoing.crossProduct( outgoing , normal ) );
+    T.normalize();
 
-    if ( T.dotProduct( T, normal ) != 0 || T.dotProduct( normal, H_bar ) != 0){
-
-        std::cout << "error _______________________________________________________________________________" << "\n" ;
-        std::cout << T.dotProduct( T, normal ) << "\n";
-        std::cout << T.dotProduct( H_bar, normal ) << "\n";
-        
-    }
     float t = normal.dotProduct( normal , H );
     float w = T.dotProduct( T, H_bar );
 
@@ -110,12 +106,56 @@ inline float brdf(float alpha, float beta, const vec3 & in,
     std::cout << "\t Zt: " << Zt << "\n";
     std::cout << "\t Gv1_by_Gv2 : " << Gv1_by_Gv2 << "\n";
     std::cout << "\t 4 * M_PI * v1 * v2 : " << 4 * M_PI * v1 * v2 << "\n";
-    
-    
 
-    return ( Gv1_by_Gv2 * Aw * Zt + (1 - Gv1_by_Gv2 ) )/ (4 * M_PI * v1 * v2 ); 
+    return first + second; 
 }
 
+float brdf(float alpha, float beta, const vec3 & in,
+                                    const vec3 & out,
+                                    const vec3 & n ){
+    vec3 outgoing = - out;
+    vec3 incoming = - in;
+    vec3 normal = n;
+
+    outgoing.normalize();
+    incoming.normalize();
+    normal.normalize();
+
+    float v1 = normal.dotProduct( normal, outgoing ) ;
+    float v2 = normal.dotProduct( normal, incoming ) ;
+
+    vec3 H = (outgoing + incoming).normalized() ;
+    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
+    H_bar.normalize();
+
+    vec3 T = outgoing.crossProduct( normal ,
+             outgoing.crossProduct( outgoing , normal ) );
+    T.normalize();
+
+    float t = normal.dotProduct( normal , H );
+
+    float Gv1 = v1 / ( alpha - alpha * v1 + v1 );
+    float Gv2 = v2 / ( alpha - alpha * v2 + v2 );
+    float Gv1_by_Gv2 = Gv1 * Gv2;
+
+    t *= t;
+    float denominator = 1 + alpha*t*t - t*t;
+    float Zt = alpha / (denominator * denominator );
+
+    float first = Gv1_by_Gv2 * Zt / (4 * M_PI * v1 * v2 );
+    float second = (1 - Gv1_by_Gv2 )  / M_PI ;
+
+    std::cout << "\t alpha: " << alpha << "\n";
+    
+    std::cout << "\t first: " << first << "\n";
+    std::cout << "\t second: " << second << "\n";
+    std::cout << "\t Zt: " << Zt << "\n";
+    std::cout << "\t Gv1_by_Gv2 : " << Gv1_by_Gv2 << "\n";
+    std::cout << "\t 4 * M_PI * v1 * v2 : " << 4 * M_PI * v1 * v2 << "\n";
+    std::cout << "brdf: " << first + second << "\n";
+
+    return first + second; 
+}
 
 
 //to keep with my other convections, direction should be the direction of the
