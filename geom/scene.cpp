@@ -1,6 +1,7 @@
 #include "scene.h"
 #include <math.h>
-
+#include <limits.h>
+#include <stdio.h>
 using cs40::Ray;
 using cs40::Shape;
 using cs40::Light;
@@ -19,43 +20,53 @@ using cs40::Scene;
 int Scene::checkIntersection( const Ray & incidentRay, 
                               int shapeIndex, 
                               vec3 & hitPoint ) const{
-  float currentTime , minTime;
-  minTime = INFINITY;
-  int minIndex = -2;
+    float currentTime , minTime;
+    //if the ray is inside the object, then it means that
+    //I only want to intersect with the current object.
+    if ( incidentRay.isInsideObject ){
+        currentTime = objects[shapeIndex]->hitTime( incidentRay );
+        hitPoint = incidentRay( currentTime );
+        return shapeIndex;
+    } 
 
-  for ( int i = 0 ; i < objects.size(); i ++ ){
-    if ( shapeIndex == i ){ continue ;}
+    minTime = INFINITY;
+    int minIndex = -2;
 
-    currentTime = objects[i]->hitTime( incidentRay );
-    if ( (currentTime < minTime ) && ( currentTime > 0 )){
-      minTime = currentTime;
-      minIndex = i;
+    for ( int i = 0 ; i < objects.size(); i ++ ){
+        if ( shapeIndex == i ){ continue ;}
+
+        currentTime = objects[i]->hitTime( incidentRay );
+        if ( (currentTime < minTime ) && ( currentTime > 0 )){
+            minTime = currentTime;
+            minIndex = i;
+        }
     }
-  }
 
-  if ( minIndex >= 0 ){
-    hitPoint = incidentRay( minTime );
-  }
+    if ( minIndex >= 0 ){
+        hitPoint = incidentRay( minTime );
+    }
 
-  return minIndex;
-
+    return minIndex;
 }
 
 
 float Scene::collisionTime(const Ray & incidentRay, int shapeIndex ) const{
-  float currentTime , minTime;
-  minTime = INFINITY;
-
-  //check all of the intersection times for the shapes
-  for ( int i = 0 ; i < objects.size(); i ++ ){
-    if ( i == shapeIndex ){ continue; }
-
-    currentTime = objects[i]->hitTime( incidentRay );
-    if ( currentTime < minTime && currentTime > 0 ){
-      minTime = currentTime;
+    float currentTime , minTime;
+    minTime = INFINITY;
+    if ( incidentRay.isInsideObject ){
+        return 0.0;
     }
-  }
 
-  return minTime;
+    //check all of the intersection times for the shapes
+    for ( int i = 0 ; i < objects.size(); i ++ ){
+        if ( i == shapeIndex ){ continue; }
+
+        currentTime = objects[i]->hitTime( incidentRay );
+        if ( currentTime < minTime && currentTime > 0.0 ){
+            minTime = currentTime;
+        }
+    }
+
+    return minTime;
 
 }

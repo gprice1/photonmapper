@@ -1,0 +1,66 @@
+#comment
+output test.png
+outsize 512 512
+origin -5 -5 8
+eye 0 0 15
+horiz 10 0 0
+vert 0 10 0
+
+#assign names to colors
+color blue 0 0 .8
+color clear 1 1 1
+color yellow 0.8 0.6 0.1
+background 0 0 0 
+
+mat amb yellow
+mat diff yellow
+mat spec yellow
+alpha 0.95
+beta 0.5
+local 1.0
+reflect 0
+transmit 0 0
+mat save yellow
+
+mat amb clear
+mat diff clear
+alpha 0.0
+beta 0.0
+local 0.0
+reflect 0.15
+#a vaccuum has a refractive index of 1.0, and other objects usually have 
+#a refractive index higher than that.
+transmit .85 1.05 
+mat spec 1 1 1
+mat save clear
+
+mat amb blue
+mat diff blue
+mat spec blue
+local 1.0
+alpha 0.95
+beta 0.5
+reflect 0.0
+transmit 0.0 0.0
+mat save blue
+
+
+mat load clear
+
+#center x,y,z radius
+#material set to current material
+sphere -3 -1 3 4
+
+mat load yellow
+#floor
+rectangle -15 -5 15.1   15 -5 15.1  15 -5 -10
+
+mat load blue
+#front wall
+rectangle -15 -5.1 -10   15 -5.1 -10     15 10 -10 
+ 
+#global ambient
+amblight 0.2
+
+#xyz pos intensity
+light -10 6 -2 0.3

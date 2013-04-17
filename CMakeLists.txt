@@ -37,13 +37,12 @@ set(LIBSRCS raytracer.cpp photonmapper.cpp)
    
 add_library(rtrace ${HDRS} ${LIBSRCS})
 
-#  add these to library above when ready
-#  sphere.h sphere.cpp
-#  rectangle.h rectangle.cpp
-#  triangle.h triangle.cpp
 
 SET(MYLIBS ${EXT_LIBS} )
+#add_executable(profiler profiler.cpp)
+
 add_executable(makescene ${HDRS} makescene.cpp)
+
 
 #include_directories( ${DIREC} )
 #link_directories( ${DIREC} )
@@ -51,6 +50,7 @@ add_executable(makescene ${HDRS} makescene.cpp)
 set(ALLLIBS rtrace ${EXT_LIBS} ${PNG_LIBRARIES} geom_lib parse_lib
                                                  png_lib)
 target_link_libraries(makescene ${ALLLIBS})
+#target_link_libraries(profiler ${ALLLIBS})
 
 symlink_data(raytracer *.txt)
 

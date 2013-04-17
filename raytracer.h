@@ -55,16 +55,6 @@ private:
 
     vec3 traceOnce( const cs40::Ray & incidentRay, int shapeIndex, int step );
 
-    /* take an incident ray, and find what it intersects
-     * set the status of the ray based on what happened
-     * set the position of the ray to the point of intersection
-     * finally, return the shape that it intersected with */
-    int checkIntersection( const cs40::Ray & incidentRay, vec3 & hitPoint, int shapeIndex );
-
-    //takes an incident ray and returns the collision time of the closest
-    //colliding object.
-    float collisionTime( const cs40::Ray & incidentRay, int shapeIndex);
-
     //does the phong coloration.
     //also takes care of shadowing.
     vec3 phong( const cs40::Ray & incidentRay ,
@@ -73,15 +63,16 @@ private:
                 int shapeIndex);
 
     /* takes an incident ray and a normal vector and comutes a
-     * reflection ray. */
+     * reflection ray.
     vec3 reflect( const vec3 & incidentRay,
                   const vec3 & normal );
 
-    /* takes an incident ray and a normal vector and comutes a
-     * transmission ray. This function likely needs a refraction index*/
-    cs40::Ray transmit( const cs40::Ray & incidentRay,
-                        vec3 normal,
-                        Shape * currentShape );
+    vec3 transmit(const vec3 & direction, const vec3 & normal,
+                 float n1, float n2 );
+
+    inline float fresnel( const vec3 & direction, const vec3 & normal,
+                          float n1, float n2 );
+*/
 
     void loadModel( char * objectFile );
     

@@ -1,6 +1,5 @@
 #include "sphere.h"
 #include <math.h>
-using namespace std;
 using namespace cs40;
 
 Sphere::Sphere(vec3 center, float radius, cs40::Material material){
@@ -36,20 +35,32 @@ float Sphere::hitTime(const cs40::Ray& r) const{
 
     //cout << "\tDeterminant2: " << determinant;
     //cout << "\tA: " << A << endl;
-
+    //std::cout << "The value is : " <<    << std::endl;
 
     if ( B > 0 ){
       if (determinant < B){ return -0.5; } // the intersection is in the wrong
                                            //direction
+                                           //
+      //if determinant >= B 
       //cout  << "sphere hit point: " << r((-B + determinant) / (2*A)) << endl;
+      
       return (-B + determinant) / (2*A);
     }
 
-    // if B < 0 :
-    if (determinant <= -B) {
-        //cout  << "sphere hit point: " << r((-B + determinant) / (2*A)) << endl;
-        return (-B - determinant) / (2*A); }
+    //this takes care of the really annying self-collision cases
+    if (r.isInsideObject &&
+       ( B + determinant ) > - 0.0001 &&
+       ( B + determinant) < 0.0001  ){
 
+        return (-B + determinant) / (2*A);
+    }
+    
+    // if B <= 0 :
+    if (determinant <= -B) {
+        
+        //cout  << "sphere hit point: " << r((-B + determinant) / (2*A)) << endl;
+        return (-B - determinant) / (2*A);
+    }
 
     //cout  << "sphere hit point: " << r((-B + determinant) / (2*A)) << endl;
     return (-B + determinant) / (2*A);

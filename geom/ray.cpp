@@ -9,7 +9,8 @@ using cs40::Ray;
 Ray::Ray():origin(0,0,0),direction(0,0,-1){ isInsideObject = false; };
 
 Ray::Ray(const Ray& other):
-    origin(other.origin), direction(other.direction) { };
+    origin(other.origin), direction(other.direction),
+    isInsideObject( other.isInsideObject) { };
 
 Ray::Ray(const vec3& src, const vec3& dir):
     origin(src), direction(dir){ };

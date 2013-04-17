@@ -62,11 +62,14 @@ private:
     //the numnber of nearest neighbors.
     int N;
 
+    float caustic_power, indirect_power;
+
 //___________________________Private Functions________________________________
     void build();
 
     void tracePhoton(const cs40::Scene & scene , cs40::Ray & incidentRay,
-                     const vec3 & incidentColor);
+                     const vec3 & incidentColor, bool isCaustic , int depth,
+                     int shapeIndex);
 
     void addIndirect( const vec3 & direction, const vec3 & hitPoint,
                     const vec3 & incidentColor );
@@ -75,6 +78,25 @@ private:
                      const vec3 & incidentColor );
 
     inline KDTree::kd_point vec3_to_kdPoint( const vec3 & vector );
+
+    inline vec3 phong( const cs40::Photon * photon, const vec3 & hitPoint,
+                                              const vec3 & normal,
+                                              const vec3 & incident,
+                                              const cs40::Material & mat);
+
+    vec3 getIndirectIllumination( const vec3 & point,
+                          const vec3 & incident,
+                          const vec3 & normal,
+                          const cs40::Material & mat );
+
+    vec3 getCausticIllumination( const vec3 & point,
+                                 const vec3 & incident,
+                                 const vec3 & normal,
+                                 const cs40::Material & mat );
+
+    void kdTest();
+    
+
 
 };
 

@@ -13,13 +13,24 @@ color blue 0 0 0.8
 color red 1 0 0 
 color clear 0 0 0
 color mirror 1 1 1
+color yellow 1 1 0
 
 background 0 0 0 
+
+mat amb yellow
+mat diff yellow
+mat spec yellow
+alpha 0.95
+beta 0.5
+local 1.0
+reflect 0
+transmit 0 0
+mat save yellow
 
 #define color by name
 mat amb green
 mat diff green
-alpha 0.5
+alpha 0.2
 beta 0.5
 local 1.0
 reflect 0.2
@@ -31,22 +42,25 @@ mat spec 1 1 1
 mat save green
 
 #define color by name
-#mat amb clear
-#mat diff clear
-#local 0.1
-#reflect 0.05
-#transmit 0 0
-#mat spec 1 1 1
-#mat save clear
+mat amb clear
+mat diff clear
+alpha 0.0
+beta 0.0
+local 0.1
+reflect 0.05
+transmit .85 1.5
+mat spec 1 1 1
+mat save clear
 
 #define color by name
-#mat amb mirror
-#mat diff mirror
-#local .5
-#reflect 1.0
-#transmit 0.0 0.0
-#mat spec 1 1 1
-#mat save mirror
+mat amb mirror
+mat diff mirror
+alpha = 0.0
+local .5
+reflect 1.0
+transmit 0.0 0.0
+mat spec 1 1 1
+mat save mirror
 
 mat amb blue
 mat diff blue
@@ -61,9 +75,8 @@ mat amb red
 mat diff red
 mat spec 0 1 1
 local 1.0
-alpha 0.5
+alpha 0.85
 beta 0.5
-
 reflect 0.0
 transmit 0.0 0.0
 mat save red
@@ -82,27 +95,28 @@ mat load red
 sphere 4 0 0 1
 sphere 0 5 0 3
 
-#mat load mirror
+mat load red
 #floor
 rectangle -15 -5.1 15.1   15 -5.1 15.1  15 -5.1 -10
 #left wall
-rectangle -15 -5.1 15.1   -15 10 15.1  -15 10 -10
+rectangle -15 -5.1 15.1  -15 10 -10    -15 10 15.1  
 #back wall
-rectangle 15 10 15.1    15 10 15.1   -15 -5.1 15.1
-#left wall
-rectangle 15 -5.1 15.1   15 10 15.1  15 10 -10
-#front wall
-rectangle -15 -5.1 -10   15 10 -10  15 10 -10
-#ceiling
-rectangle -15 10 15.1   15 10 15.1  15 10 -10
+rectangle 15 10 15.1     15 -5.1 15.1   -15 -5.1 15.1    
+#right wall
 
+mat load yellow
+rectangle 15 -5.1 15.1    15 10 15.1    15 10 -10 
+#front wall
+rectangle -15 -5.1 -10   15 -5.1 -10     15 10 -10  
+#ceiling
+rectangle -15 10 15.1    15 10 -10    15 10 15.1  
 
 mat load blue #eol comment
 #xyz of ll, lr, ur
 rectangle -5 -5 5  5 -5 5  5 -5 -5
 
 #global ambient
-amblight 0.1
+amblight 0.2
 
 #xyz pos intensity
 light 0 3 10 0.3 
