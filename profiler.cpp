@@ -15,46 +15,58 @@ RGBColor convertColor( vec3& clr);
 
 int main(){
     vec3 bgcolor( 0, 0, 0);
-    RGBImage img(M_PI / 2 / 0.02,
-                 M_PI * 2 / 0.02,
+    RGBImage img(M_PI / 2 / 0.02 +1,
+                 M_PI * 2 / 0.02 +1,
                  convertColor( bgcolor ) );
 
     float alpha, beta, brdfValue;
-    alpha = .5;
-    beta = 0.2;
+    alpha = 0.01;
+    beta = 0.5;
 
-    vec3 incoming, outgoing, normal;    
-    incoming = angle_to_direction( M_PI /2, M_PI/4 );
-    normal   = angle_to_direction( 0, M_PI/2 );
+    vec3 incoming, outgoing, normal; 
+    incoming = angle_to_direction( M_PI/4, 0 );
+    normal   = angle_to_direction( M_PI/2, 0 );
     
     vec3 color;
+    int k , l;
+    k = 0;
 
     for ( float i = 0.0; i < M_PI / 2 ; i += 0.02) {
+        l = 0;
         for ( float j = 0.0; j < M_PI * 2 ; j += 0.02){
         
             outgoing = angle_to_direction( i , j );
-            brdfValue = cs40::brdf( alpha, beta, -incoming, -outgoing, normal );
+
+            //cout << "outgoing: " << outgoing << "\n";
+
+            brdfValue = cs40::brdf_s( alpha, beta, incoming, outgoing, normal );
+
             if ( brdfValue > 1.0 ){
-                cout << "BRDF value: " << brdfValue << "\n";
+                cout << "\tBRDF value: " << brdfValue << "\n";
                 cout << "\tTheta: " << i <<"\n";
                 cout << "\tPhi: " << j <<"\n";
                 color = vec3( sqrt( sqrt( brdfValue )) - 1 , 0 ,1);
             }
             else if (brdfValue < 0.0 ){
-                cout << "BRDF value: " << brdfValue << "\n";
+                cout << "\tBRDF value: " << brdfValue << "\n";
                 cout << "\tTheta: " << i <<"\n";
                 cout << "\tPhi: " << j <<"\n";
             }
             else{
-                color = vec3( 0, 1, brdfValue*brdfValue );
+                color = vec3( brdfValue, brdfValue, brdfValue );
+                //cout << "\tBRDF value: " << brdfValue << "\n";
             }
 
-            img( int(i/0.02) , int(j/0.02) ) = convertColor( color );
+            img( k , l ) = convertColor( color );
+            l ++;
         }
+        k++;
     }
+
 
     img.saveAs( "profile.png" , true);
     cout << "Saved result to " << "profile.png" << endl;
+    cout << "incoming: " << incoming << "\n";
     cout << "normal: " << normal << "\n";
 
     return 0;

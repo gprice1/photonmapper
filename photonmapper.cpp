@@ -18,18 +18,34 @@ using cs40::Scene;
 using cs40::Ray;
 
 PhotonMapper::PhotonMapper( ){
-    total_indirect = 2;
-    total_caustic  = 100000;
-    indirect_photons.reserve( total_indirect );
-    caustic_photons.reserve( total_caustic );
-    indirect_positions = new KDTree::kd_point[ total_indirect ];
-    caustic_positions = new KDTree::kd_point[ total_caustic ];
-    epsilon = 0.2;
+    total_indirect = 1000000;
+    total_caustic  = 1000000;
+    if ( total_indirect > 0 ){
+        indirect_positions = new KDTree::kd_point[ total_indirect ];
+        indirect_photons.reserve( total_indirect );
+    }
+    else {
+        indirect_positions = NULL;
+    }
+    
+    if ( total_caustic > 0 ){
+        caustic_positions = new KDTree::kd_point[ total_caustic ];
+        caustic_photons.reserve( total_caustic );
+    }
+    else {
+        caustic_positions = NULL;
+    }
+
+    epsilon = 0.01;
     current_indirect = 0;
     current_caustic  = 0;
-    N = 10;
-    caustic_power = 0.1;
-    indirect_power = 0.1;
+    //N = 20;
+    range = 0.1;
+
+    caustic_power = 0.001;
+    indirect_power = 0.001;
+
+    print = false;
 }
 
 PhotonMapper::PhotonMapper( int num_photons ){
@@ -46,53 +62,47 @@ PhotonMapper::PhotonMapper( int num_photons, float e ){
 
 
 PhotonMapper::~PhotonMapper(){
-    indirect_photons.clear();
-    caustic_photons.clear();
-    delete [] indirect_positions;
-    delete [] caustic_positions;
+    if ( total_indirect > 0 ){
+        delete [] indirect_positions;
+        indirect_photons.clear();
+    }
+
+    if ( total_caustic > 0 ){
+        caustic_photons.clear();
+        delete [] caustic_positions;
+    }
 }
 
 void PhotonMapper::mapScene( const Scene &scene ){
-    vec3 direction;
-
-    //based on how intense a light is, it will either emit more or less photons
-    float totalLight = 0;
-    vector< float > intensityMapping;
-    for ( int i = 0; i < scene.lights.size() ; i ++ ){
-        totalLight += scene.lights[i].intensity;
-        intensityMapping.push_back( totalLight );
-        cout << "int asldkfm: " << intensityMapping[i] << "\n";
-    }
-    cout <<  "Intensity: " << totalLight << "\n";
-    
 
 
     //each photon should account for less of hte lighting if there are more
     //photons, so light_reduction takes care of that.
     //TODO how do I make light_reduction more physically based?
-    float lightVal;
     
-
     while ( current_indirect < total_indirect ||
             current_caustic < total_caustic ){
 
-        if ( current_indirect + current_caustic % 10000 == 0 ){
-            std::cout << "photon number: " << current_indirect << std::endl;
-        }
-        //std::cout << "shooting photon: " << current_photons << std::endl;
-        
-        //gets a random light from which to emit
-        lightVal = (float)rand()/(float)RAND_MAX * totalLight;
-        int i = 0;
-        while( lightVal > intensityMapping[ i ] ){
-            i ++;
+        if ( print ){
+            int percentIndirect, percentCaustic;
+            int indirectDivisor, causticDivisor;
+
+            indirectDivisor = total_indirect / 100 + 1;
+            causticDivisor  = total_caustic / 100 + 1;
+
+            //get the percent done
+            if ( current_indirect % indirectDivisor == 0 ||
+                 current_caustic  % causticDivisor  == 0 ){
+
+                percentIndirect = current_indirect / indirectDivisor;
+                percentCaustic  = current_caustic  / causticDivisor;
+                std::cout << "indirect: " << percentIndirect << "\t\t";
+                std::cout << "caustic: " <<  percentCaustic  << "\n";
+            
+            }
         }
 
-        vec3 origin( scene.lights[i].position );
-        direction = getRandomDirection();
-
-        Ray incidentRay( origin, direction );
-        
+        Ray incidentRay = scene.emitPhoton();
         tracePhoton( scene, 
                      incidentRay, 
                      vec3(1, 1, 1 ),
@@ -104,7 +114,7 @@ void PhotonMapper::mapScene( const Scene &scene ){
     //this makes sure that the correct total gets set at the end.
     if ( total_indirect != current_indirect){
         std::cout << "total_indirect is not equal to current photons"<< std::endl;
-        exit( 1 );
+        exit( -1 );
     }
     
     build();
@@ -120,8 +130,10 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
                                bool isCaustic,
                                int depth,
                                int shapeIndex){
+
+    if ( depth > 4 ){ return ; }
+
     vec3 hitPoint;
-    float randVal;
 
     shapeIndex = scene.checkIntersection( incidentRay,
                                           shapeIndex,
@@ -134,15 +146,26 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
     Material mat = shape->material;
     vec3 normal = shape->normal( hitPoint );
     incidentRay.origin = hitPoint;
+
+    //the photon will either be reflected or absorbed
+    //TODO : find a better model of absorption.
+    //right now I am using the darkness and lightness of a material to determine
+    //absorbtion. 
+    float absorbtionValue = mat.ambient.x() + mat.ambient.y() +  mat.ambient.z();
+    absorbtionValue /= 3;
+
+    //A totally white surface will never absorb a photon, and a totally black
+    //surface will always absorb photons
+    if ( absorbtionValue < randf() ){
+        //photon was absorbed and not reflected
+        return;
+    }
     
-
-    randVal = (float)rand()/(float)RAND_MAX;
-
     //photons only stick on diffuse surfaces, so the higher the alpha, the
     //higher the likelihood the photon will stick.
     //TODO I am only using this for indirect lighting, maybe this is not 
     //how it is meant to be used?????
-    if ( mat.alpha > randVal && depth != 0 ){
+    if ( mat.alpha > randf() && depth != 0 ){
         if( isCaustic){
             addCaustic( incidentRay.direction, hitPoint, incidentColor );
             isCaustic = false;
@@ -152,14 +175,6 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         }
     }
 
-    //the photon will either be reflected or absorbed
-    //The lower alpha is, the more specular it is, and therefore more likely to
-    //reflect a photon.
-    randVal = (float)rand()/(float)RAND_MAX;
-    if ( mat.alpha > randVal ){
-        //photon was absorbed and not reflected
-        return;
-    }
 
 
     //TODO MAKE PROTON REFLECTANCE BASED ON THE BRDF !!!!!!!!!!!!!!!
@@ -167,19 +182,21 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     
-    //if the photon is reflected, trace another photon
-    
-    //reflect diffusely
-    if ( total_indirect > current_indirect &&
-         mat.alpha > (float)rand()/(float)RAND_MAX ){
+    float randVal = randf();
 
+    //reflect diffusely
+    if ( current_indirect < total_indirect &&
+         mat.alpha > randVal ){
+        
         incidentRay.direction = cs40::randomHemisphereDirection( normal );
+        
         tracePhoton( scene, incidentRay, incidentColor * mat.diffuse,
-                     false, depth+1, shapeIndex );
+                     false, depth+1, shapeIndex ); 
     }
 
     //reflect specularly
-    else{
+    else if( mat.alpha < randVal ){
+        
         float n1, n2;
         if (incidentRay.isInsideObject){
             normal *= -1;
@@ -197,8 +214,7 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         //For some reason, the fresnel equation is preventing my program from 
         //seg faulting.
         if ( mat.refractionIndex >  0.1 &&
-             cs40::fresnel(incidentRay.direction, normal, n1, n2 ) <
-             (float)rand()/(float)RAND_MAX) {
+             cs40::fresnel(incidentRay.direction, normal, n1, n2 ) < randf() ) {
          
             //the light is refracted
             incidentRay.direction = cs40::transmit( incidentRay.direction,
@@ -214,13 +230,14 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         else{
 
             incidentRay.direction = cs40::reflect( incidentRay.direction,
-                                                   normal);
+                            normal);
             tracePhoton( scene, incidentRay,
                          incidentColor * mat.specular,
                          isCaustic, depth+1, shapeIndex );
 
         }
     }
+    
 }
 
 
@@ -228,21 +245,54 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
 //builds the trees from the datasets.
 void PhotonMapper::build(){
     cout << "Building" << endl;
-    //indirect_tree.build( indirect_positions , current_indirect );
-    caustic_tree.build( caustic_positions , current_caustic );
+    if ( current_indirect > 0 ){
+        indirect_tree.build( indirect_positions , current_indirect );
+    }
+    if ( current_caustic > 0 ){
+        caustic_tree.build( caustic_positions , current_caustic );
+    }
     //kdTest();
     
 }
+
+vec3 PhotonMapper::visualizePhotons( const vec3 & point , float clearance){
+    KDTree::kd_point p = vec3_to_kdPoint( point );
+    
+    std::vector<KDTree::kd_neighbour> neighbours;
+        
+    indirect_tree.knn( p , 1 , neighbours, epsilon );
+    
+    if ( neighbours[0].squared_distance < clearance ){
+        return indirect_photons[ neighbours[0].index ]->color;
+    }
+
+    neighbours.pop_back();
+    caustic_tree.knn( p , 1 , neighbours, epsilon );
+    
+    if ( neighbours[0].squared_distance < clearance ){
+        return caustic_photons[ neighbours[0].index ]->color;
+        
+    }
+
+    return vec3();
+}
+
 
 vec3 PhotonMapper::getIllumination( const vec3 & point,
                                     const vec3 & incident,
                                     const vec3 & normal,
                                     const Material & mat ){
-    vec3 total_color( 0,0,0);
-    total_color += getCausticIllumination( point, incident, normal, mat );
-    //total_color += getIndirectIllumination( point, incident, normal, mat );
 
-    return total_color ;
+    vec3 color(0,0,0);
+
+    if ( current_caustic > 0 ){
+        color = getCausticIllumination( point, incident, normal, mat );
+    }
+    if ( current_indirect > 0 ){
+        color += getIndirectIllumination( point, incident, normal, mat );
+    }
+    //total_color = visualizePhotons( point, 0.0001 );
+    return color ;
 }
 
 
@@ -258,7 +308,11 @@ vec3 PhotonMapper::getIndirectIllumination( const vec3 & point,
     
     std::vector<KDTree::kd_neighbour> neighbours;
         
-    indirect_tree.knn( p , N , neighbours, epsilon );
+    if ( N > 0 ){
+        indirect_tree.knn( p , N , neighbours, epsilon );
+    }else {
+        indirect_tree.all_in_range( p, range, neighbours );
+    }
 
     vec3 total_color, color;
     int currentIndex;
@@ -266,12 +320,21 @@ vec3 PhotonMapper::getIndirectIllumination( const vec3 & point,
     for ( int i = 0; i < neighbours.size() ; i ++){
         currentIndex = neighbours[i].index;
         color = phong( indirect_photons[ currentIndex ],
-                       point, normal, incident, mat);
+                       normal, incident, mat);
+
         //color /= neighbours[i].squared_distance * M_PI;
         total_color += color;
     } 
-    total_color /= neighbours[ N - 1 ].squared_distance * M_PI;
-    cs40::clampTop( total_color , 1.0 );
+
+    if ( N > 0 ){
+        total_color /= sqrt(neighbours[ N - 1 ].squared_distance);
+    }
+    else {
+        total_color /= range;
+    }
+
+    total_color *= indirect_power;
+    //cs40::clampTop( total_color , 1.0 );
 
     return total_color;
 
@@ -286,21 +349,33 @@ vec3 PhotonMapper::getCausticIllumination( const vec3 & point,
     
     std::vector<KDTree::kd_neighbour> neighbours;
         
-    caustic_tree.knn( p , N , neighbours, epsilon );
+    if ( N > 0 ){
+        caustic_tree.knn( p , N , neighbours, epsilon );
+    }else {
+        caustic_tree.all_in_range( p, range, neighbours );
+    }
 
     vec3 total_color, color;
     int currentIndex;
 
     for ( int i = 0; i < neighbours.size() ; i ++){
         currentIndex = neighbours[i].index;
-        color = phong( caustic_photons[ currentIndex ],
-                       point, normal, incident, mat);
+        //color = phong( caustic_photons[ currentIndex ],
+        //               normal, incident, mat);
+        color = brdf( caustic_photons[ currentIndex ],
+                        normal, incident, mat);
         //color /= neighbours[i].squared_distance * M_PI;
         total_color += color;
     } 
-    total_color /= neighbours[ N - 1 ].squared_distance * M_PI;
-    cs40::clampTop( total_color , 1.0 );
+    if ( N > 0 ){
+        total_color /= sqrt(neighbours[ N - 1 ].squared_distance);
+    }
+    else {
+        total_color /= range;
+    }
 
+    total_color *= caustic_power;
+    //cs40::clampTop( total_color , 1.0 );
 
     return total_color;
 }
@@ -311,13 +386,14 @@ void PhotonMapper::addIndirect( const vec3 & direction, const vec3 & hitPoint,
     if ( current_indirect >= total_indirect ){
         return;
     }
-    current_indirect ++;
 
-    Photon * photon = new Photon( direction,
-                                  incidentColor * indirect_power / N );
+    Photon * photon = new Photon( direction, incidentColor );
+
     indirect_photons.push_back( photon );
-
     indirect_positions[ current_indirect ] = vec3_to_kdPoint( hitPoint );
+
+    current_indirect ++;
+    
         
 }
 
@@ -327,13 +403,13 @@ void PhotonMapper::addCaustic( const vec3 & direction, const vec3 & hitPoint,
     if ( current_caustic >= total_caustic){
         return;
     }
-    current_caustic ++;
 
-    Photon * photon = new Photon( direction,
-                                  incidentColor * caustic_power / N);
+    Photon * photon = new Photon( direction, incidentColor );
+
     caustic_photons.push_back( photon );
-
     caustic_positions[ current_caustic ] = vec3_to_kdPoint( hitPoint );
+
+    current_caustic ++;
         
 }
 
@@ -347,25 +423,36 @@ inline KDTree::kd_point PhotonMapper::vec3_to_kdPoint( const vec3 & vector ){
     return p;
 }
 
-inline vec3 PhotonMapper::phong( const Photon * photon, const vec3 & hitPoint,
-                                              const vec3 & normal,
-                                              const vec3 & incident,
-                                              const Material & mat){
+inline vec3 PhotonMapper::phong( const Photon * photon,
+                                 const vec3 & normal,
+                                 const vec3 & incident,
+                                 const Material & mat){
 
     vec3 color( 0,0,0);
     double k_diffuse, k_specular;
 
-    k_diffuse = cs40::phongDiffuse( photon->direction, normal);
+    k_diffuse = cs40::phongDiffuse( -photon->direction, normal);
     color += k_diffuse * photon->color;
-
-    k_specular = cs40::phongSpecular( photon->direction,
-                                      normal ,
-                                      incident,
-                                      10);
-
+/*
+    k_specular = cs40::phongSpecular( -photon->direction,
+                                       normal ,
+                                      -incident,
+                                       10);
     color += k_specular * photon->color;
-
+*/
     return color;
+}
+
+
+inline vec3 PhotonMapper::brdf(const Photon * photon,                                                             const vec3 & normal,
+                               const vec3 & incident,
+                               const Material & mat){
+
+    double brdfVal = brdf_s( mat.alpha, mat.beta, -photon->direction, 
+                                                  -incident,
+                                                  normal);
+    return photon->color * brdfVal;
+
 }
 
 //this performs a simple test to see if the kd tree is working like I think it
@@ -399,5 +486,7 @@ void PhotonMapper::kdTest( ){
     }
     cout << "Total # wrong : " << number_wrong << "\n" ;
 }
+
+
 
 

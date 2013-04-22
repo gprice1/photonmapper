@@ -1,5 +1,5 @@
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} .
-     ../kdtree ../png ../parse ../scene )
+     ../png ../parse ../ )
 
 set(HDRS
   common.h ray.h shape.h 
@@ -9,7 +9,7 @@ set(HDRS
 
 set(LIBSRCS common.cpp  scene.cpp ray.cpp 
     sphere.cpp rectangle.cpp triangle.cpp
-    photon.cpp )
+    photon.cpp light.cpp )
    
 add_library(geom_lib ${HDRS} ${LIBSRCS})
 

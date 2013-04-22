@@ -2,6 +2,8 @@
 #include <math.h>
 #include <limits.h>
 #include <stdio.h>
+#include "functions.h"
+
 using cs40::Ray;
 using cs40::Shape;
 using cs40::Light;
@@ -49,13 +51,37 @@ int Scene::checkIntersection( const Ray & incidentRay,
     return minIndex;
 }
 
+//returns false if there is an object with a hit time between 0.0 and 1.0
+bool Scene::isObstructed(const Ray & incidentRay, int shapeIndex ) const{
+    float currentTime;
+
+    //if ( incidentRay.isInsideObject ){
+    //    return true;
+    //}
+
+    //check all of the intersection times for the shapes
+    for ( int i = 0 ; i < objects.size(); i ++ ){
+        if ( i == shapeIndex ){ continue; }
+
+        currentTime = objects[i]->hitTime( incidentRay );
+        if ( currentTime < 1.0 && currentTime > 0.0 ){
+            //std::cout << "True\n";
+            return true;
+
+        }
+    }
+
+    return false;
+
+}
+
 
 float Scene::collisionTime(const Ray & incidentRay, int shapeIndex ) const{
     float currentTime , minTime;
     minTime = INFINITY;
-    if ( incidentRay.isInsideObject ){
-        return 0.0;
-    }
+    //if ( incidentRay.isInsideObject ){
+    //    return 0.0;
+    //}
 
     //check all of the intersection times for the shapes
     for ( int i = 0 ; i < objects.size(); i ++ ){
@@ -70,3 +96,30 @@ float Scene::collisionTime(const Ray & incidentRay, int shapeIndex ) const{
     return minTime;
 
 }
+
+
+//this is not designed to work for a large number of lights
+Ray Scene::emitPhoton( ) const {
+
+    float lightVal = cs40::randf( lightMapping.back() );
+
+    int i = 0;
+    while( lightVal > lightMapping[ i ] ){
+        i ++;
+    }
+
+    return lights[i].emitPhoton();
+
+}
+
+//based on how intense a light is, it will either emit more or less photons
+void Scene::createLightMapping( ) {
+
+    float totalLight = 0;
+
+    for ( int i = 0; i < lights.size() ; i ++ ){
+        totalLight += lights[i].intensity;
+        lightMapping.push_back( totalLight );
+    }
+}
+

@@ -19,6 +19,10 @@ public:
     cs40::View view;
     float ambient;           //global ambient intensity
     std::vector<cs40::Light> lights;    //other positional lights
+
+    std::vector<float> lightMapping;    //this data is used to select which
+                                        //light will emit a photon.
+    
     std::vector<cs40::Shape*> objects;  //things to raytrace
 
     int checkIntersection( const cs40::Ray & incidentRay, 
@@ -26,6 +30,13 @@ public:
                            vec3 & hitPoint ) const;
 
     float collisionTime(const cs40::Ray & incidentRay, int shapeIndex ) const;
+    bool  isObstructed( const cs40::Ray & incidentRay, int shapeIndex ) const;
+
+
+
+    cs40::Ray emitPhoton( ) const ;
+
+    void createLightMapping( );
 
 };
 

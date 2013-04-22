@@ -37,6 +37,21 @@ public:
                           const vec3 & incident,
                           const vec3 & normal,
                           const cs40::Material & mat );
+
+    int total_indirect, total_caustic;
+    
+    float epsilon;
+    
+    //the numnber of nearest neighbors.
+    int N;
+    //the range of photon collection if both this, and N are non-zero, then
+    //the program will use KNN rather than in range.
+    float range;
+
+    float caustic_power, indirect_power;
+
+    bool print;
+
     
 private:
 
@@ -44,25 +59,14 @@ private:
     KDTree indirect_tree;
     KDTree caustic_tree;
     
-    //stores the positions of the photons
-    //vector< KDTree::kd_point > indirect_positions;
-    //vector< KDTree::kd_point > caustic_positions;
-
     KDTree::kd_point * indirect_positions;
     KDTree::kd_point * caustic_positions;
     
     //stores the other data about the photons
-    vector< Photon * > indirect_photons;
-    vector< Photon * > caustic_photons;
+    vector<Photon *> indirect_photons;
+    vector<Photon *> caustic_photons;
 
-    int total_indirect, total_caustic;
     int current_indirect, current_caustic;
-    float epsilon;
-    
-    //the numnber of nearest neighbors.
-    int N;
-
-    float caustic_power, indirect_power;
 
 //___________________________Private Functions________________________________
     void build();
@@ -79,10 +83,6 @@ private:
 
     inline KDTree::kd_point vec3_to_kdPoint( const vec3 & vector );
 
-    inline vec3 phong( const cs40::Photon * photon, const vec3 & hitPoint,
-                                              const vec3 & normal,
-                                              const vec3 & incident,
-                                              const cs40::Material & mat);
 
     vec3 getIndirectIllumination( const vec3 & point,
                           const vec3 & incident,
@@ -95,8 +95,16 @@ private:
                                  const cs40::Material & mat );
 
     void kdTest();
-    
 
+    vec3 visualizePhotons( const vec3 & point , float clearance);
+    
+    inline vec3 brdf( const cs40::Photon * photon, const vec3 & normal,
+                                                   const vec3 & incident,
+                                                   const cs40::Material & mat);
+    inline vec3 phong( const cs40::Photon * photon,
+                                              const vec3 & normal,
+                                              const vec3 & incident,
+                                              const cs40::Material & mat);
 
 };
 

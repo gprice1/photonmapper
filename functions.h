@@ -9,6 +9,18 @@
 
 namespace cs40{
 
+//random float functions
+inline float randf(){
+    return (float)rand() / (float)RAND_MAX;
+}
+inline float randf( float upper ){
+    return randf() * upper ;
+}
+inline float randf( float lower, float upper ){
+    return randf() * ( upper - lower ) + lower;
+}
+
+
 inline vec3 reflect( const vec3 & incidentRay, const vec3 & normal ){
      return incidentRay - 2 * normal.dotProduct( normal, incidentRay) * normal;
 }
@@ -45,83 +57,33 @@ inline vec3 transmit( const vec3 & direction, const vec3 & normal,
 
     return transmission;
 }
-//incoming is the incoing direction
-//outgoing is the outgoing direction
-//
-//
-//T may not be the correct quantity.
-//There may also be sign errors in the incoming vector.
-//The incoming light should be from a photon
-//the outgoing light is heading to the viewer.
-inline float schlick_brdf(float alpha, float beta, const vec3 & incoming,
+
+//this is the cook - torrance brdf model
+inline float brdf_ct(float alpha, float beta, const vec3 & incoming,
                                     const vec3 & outgoing,
                                     const vec3 & normal ){
-
-    float v1 = normal.dotProduct( normal, outgoing ) ;
+    float v1 = normal.dotProduct( normal, -outgoing ) ;
     if ( v1 <= 0 ){
         return 0;
     }
-    float v2 = normal.dotProduct( normal, incoming ) ;
+
+    float v2 = normal.dotProduct( normal, -incoming ) ;
     if (v2 <= 0){
         return 0;
     }
 
-    vec3 H = (-outgoing - incoming).normalized() ;
-    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
-    H_bar.normalize();
-
-    vec3 T = outgoing.crossProduct( normal ,
-             outgoing.crossProduct( -outgoing , normal ) );
-    T.normalize();
-
-    float t = normal.dotProduct( normal , H );
-    float w = T.dotProduct( T, H_bar );
-
-    float Gv1 = v1 / ( alpha - alpha * v1 + v1 );
-    float Gv2 = v2 / ( alpha - alpha * v2 + v2 );
-    float Gv1_by_Gv2 = Gv1 * Gv2;
-
-    t *= t;
-    float denominator = 1 + alpha*t - t;
-    float Zt = alpha / (denominator * denominator );
-
-    w *= w;
-    float Aw = sqrt( beta / ( beta*beta - beta*beta*w + w ) );
-
-    float first = Gv1_by_Gv2 * Aw * Zt / (4 * M_PI * v1 * v2 );
-    float second = (1 - Gv1_by_Gv2 )  / (4 * M_PI * v1 * v2 );
-    std::cout << "\t alpha: " << alpha << "\n";
-    std::cout << "\t beta: " << beta << "\n";
-    
-    std::cout << "\t first: " << first << "\n";
-    std::cout << "\t second: " << second << "\n";
-    std::cout << "\t Aw: " << Aw << "\n";
-    std::cout << "\t Zt: " << Zt << "\n";
-    std::cout << "\t Gv1_by_Gv2 : " << Gv1_by_Gv2 << "\n";
-    std::cout << "\t 4 * M_PI * v1 * v2 : " << 4 * M_PI * v1 * v2 << "\n";
-
-    if ( first + second <= 0 ){
-        return 0 ;
-    }
-
-    return first + second;
+    return 0;
 }
 
-
-
-inline float brdf(float alpha, float beta, const vec3 & in,
-                                           const vec3 & out,
+inline float brdf(float alpha, float beta, const vec3 & incoming,
+                                           const vec3 & outgoing,
                                            const vec3 & normal ){
-    vec3 outgoing = -out;
-    vec3 incoming = -in;
-
-    outgoing.normalize();
-    incoming.normalize();
 
     float v1 = normal.dotProduct( normal, outgoing ) ;
     if ( v1 <= 0 ){ return 0; }
 
     float v2 = normal.dotProduct( normal, incoming ) ;
+
     if ( v2 <= 0 ){ return 0; }
 
     vec3 H = (outgoing + incoming).normalized() ;
@@ -138,6 +100,8 @@ inline float brdf(float alpha, float beta, const vec3 & in,
     float first = Gv1_by_Gv2 * Zt / (4 * M_PI * v1 * v2 );
     float second = (1 - Gv1_by_Gv2 )  / M_PI ;
     float brdfVal = first + second;
+
+    /*
     if ( brdfVal > 1.0 || brdfVal < 0.0 ){
         std::cout << "\t v1: " << v1 << "\n";
         std::cout << "\t v2: " << v2 << "\n";
@@ -150,9 +114,182 @@ inline float brdf(float alpha, float beta, const vec3 & in,
         std::cout << "brdf: " << first + second << "\n";
 
     }
+    */
 
-    return brdfVal; 
+    //if ( brdfVal > 1.0 ){ return 1.0; }
+    return  brdfVal; 
 }
+
+
+//incoming is the incoing direction
+//outgoing is the outgoing direction
+//
+//
+//T may not be the correct quantity.
+//this is the schlick model with both isotropy and diffuse/specular
+//this model also handles microfacets
+//TODO : The microfacet code may be defective
+//TODO : there are some very serious bounds errors and I am not sure if
+//       they are supposed to be there.
+//TODO : I am unsure of the proper value of T. 
+//All of the vectors should be pointing out of the surface of the object.
+//
+//the incoming should be the incident light.
+//the outgoing should be  view vector.
+inline float brdf_s(float alpha, float beta, 
+                       const vec3 & incoming,
+                       const vec3 & outgoing,
+                       const vec3 & normal, 
+                       const vec3 & surfaceTangent=vec3(-2,-2,-2) ) {
+
+    if (surfaceTangent.x() <= -2 ){
+        return brdf( alpha, beta, incoming, outgoing, normal );
+    }
+
+    float v1 = normal.dotProduct( normal, outgoing );
+    if ( v1 <= 0 ){
+        return 0;
+    }
+
+    float v2 = normal.dotProduct( normal, incoming ) ;
+    if (v2 <= 0){
+        
+        return 0;
+    }
+
+    vec3 H = (outgoing + incoming).normalized() ;
+    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
+    H_bar.normalize();
+
+    float t = normal.dotProduct( normal , H );
+    float w = surfaceTangent.dotProduct( surfaceTangent, H_bar );
+
+    float Gv1 = v1 / ( alpha - alpha * v1 + v1 );
+    float Gv2 = v2 / ( alpha - alpha * v2 + v2 );
+    float Gv1_by_Gv2 = Gv1 * Gv2;
+
+    t = t*t;
+    float denominator = 1 + alpha*t - t;
+    float Zt = alpha / (denominator * denominator );
+
+    w = w*w;
+    float Aw = sqrt( beta / ( beta*beta - beta*beta*w + w ) );
+
+    //TODO take this out
+
+    float brdfVal = Gv1_by_Gv2 * Aw * Zt;
+    brdfVal += (1 - Gv1_by_Gv2 );        //this line enables micro facet
+                                         //specular reflections, I may want to
+                                         //TODO take this out
+    brdfVal /= 4 * M_PI * v1 * v2;
+/*
+    if (brdfVal > 1.0 ){ 
+        std::cout << "BRDF: " << brdfVal << "\n";
+        std::cout << "\t alpha: " << alpha << "\n";
+        std::cout << "\t beta: " << beta << "\n";
+        std::cout << "\t Aw: " << Aw << "\n";
+        std::cout << "\t Zt: " << Zt << "\n";
+        std::cout << "\t Gv1_by_Gv2 : " << Gv1_by_Gv2 << "\n";
+        std::cout << "\t 4 * M_PI * v1 * v2 : " << 4 * M_PI * v1 * v2 << "\n";
+    }
+*/
+    //if ( brdfVal <= 0 ){ return 0; }
+    if ( brdfVal >= 1.0 ) { return 1.0 ;}
+
+    return brdfVal;
+}
+
+
+
+
+
+
+//this is meant to give a montecarlo importance sample for the brdf_s
+//function above.
+//TODO make this work.
+inline vec3 sample_s( float alpha, float beta, const vec3 & in,
+                                           const vec3 & out,
+                                           const vec3 & normal ){
+
+    float zenith, azimuth;
+    float A = randf();
+    float B = randf();
+
+    //this controls which quarter-shpere the ray is emitted from.
+    //int   C = (rand() % 2);
+
+    B *= B;
+    beta *= beta;
+    float B_beta = B * beta;
+    azimuth = M_PI / 2 * sqrt( B_beta / ( 1 - beta + B_beta ) );
+
+    zenith = acos( sqrt( A / ( alpha - A * alpha + A ) ) );
+
+    return vec3();
+
+}
+/*
+//for efficient rendering,
+//all of the vectors should be pointing out of the surface.
+inline float brdf_ABCD(float A, float B, float D, const vec3 & incoming,
+                                                  const vec3 & outgoing,
+                                                  const vec3 & normal ){
+
+    float v1 = normal.dotProduct( normal, outgoing ) ;
+    if ( v1 <= 0 ){ return 0; }
+
+    float v2 = normal.dotProduct( normal, incoming ) ;
+
+    if ( v2 <= 0 ){ return 0; }
+
+    //H is the halfway vector between incoming and outgoing
+    vec3 H = (outgoing + incoming) ;
+
+    //H_hat is the normalized halfway vector
+    vec3 H_hat = H.normalized();
+
+    //H_bat is the halfway vector projected into the surface plane
+    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
+    H_bar.normalize();
+
+    //the difference between the reflection vector and the outgoing vector
+    vec3 Dp = H - normal.dotProduct( H, normal) * normal;
+
+    vec3 Ti = outgoing.crossProduct( normal ,
+             outgoing.crossProduct( incoming , normal ) );
+    Ti.normalize();
+
+    vec3 To = outgoing.crossProduct( normal ,
+             outgoing.crossProduct( outgoing , normal ) );
+    To.normalize();
+
+    float w = T.dotProduct( T, H_bar );
+    float t = normal.dotProduct( normal , H );
+   
+    //this is phi out when we put phi_in at pi that phi_in is pi
+    float sin_phi_out , cos_phi_out;
+    cos_phi_out = Ti.dotProduct( Ti, To );
+    sin_phi_out = sqrt( 1 - cos_phi_out*cos_phi_out );
+
+    float sin_out = sqrt( 1 - v1*v1 );
+    float sin_in  = sqrt( 1 - v2*v2 );
+
+    float fx, fy, f, 1_over_gamma;
+    fx = ( sin_out * cos_phi_out - sin_out );
+    fy = sin_out * sin_phi_out;
+    f = sqrt( fx*fx + fy*fy );
+
+    float B, C;
+    B = b * b;
+    C = (c + 1)/2;
+    float spectralDensity = A / pow( 1 + B*f*f , C  );
+    
+    
+    return  brdfVal; 
+}
+
+*/
+
 
 
 //to keep with my other convections, direction should be the direction of the
@@ -215,11 +352,13 @@ inline float approxFresnel( const vec3 & direction, const vec3 & normal,
 
 }
     
+//theta is the zenith angle, while phi is the azimuth angle
+//this corresponds the the general convention of most brdfs 
 inline vec3 angle_to_direction( float theta, float phi ){
     vec3 direction;
-    direction.setX( sin( phi ) * cos( theta ) );
-    direction.setY( sin( phi ) * sin( theta ) );
-    direction.setZ( cos( phi ) );
+    direction.setX( cos( theta ) * cos( phi ) );
+    direction.setY( cos( theta ) * sin( phi ) );
+    direction.setZ( sin( theta ) );
 
     return direction;
 
@@ -234,12 +373,75 @@ inline vec2 direction_to_angle( const vec3 & direction ){
 
 
 inline vec3 getRandomDirection(){
+
+    int top_or_bottom = (rand() % 2);
+    
+    float A, B, B_sqrt, A_2pi;
+    
+    A = randf();
+    B = randf();
+    
+    A_2pi = 2 * M_PI * A;
+    B_sqrt = sqrt( B );
+
+    //if it comes out bottom, then multiply the z component by -1
+    if ( top_or_bottom ){
+        return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, -sqrt( 1 - B ) ) ;
+    }
+
+    return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, sqrt( 1 - B ) ) ;
+}
+
+//this maps from the unit square to vectors on the unit circle
+inline vec3 mapToHemisphere( float A, float B ){
+    float A_2pi = 2 * M_PI * A;
+    float B_sqrt = sqrt( B );
+
+    return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, sqrt( 1 - B ) ) ;
+}
+
+inline vec3 mapToHemisphericalDirection( float A, float B, const vec3 & normal ){
+
+    vec3 direction = mapToHemisphere( A, B );
+
+    vec2 directionAngle, normalAngle, resultAngle;
+    directionAngle = direction_to_angle( direction );
+    normalAngle = direction_to_angle( normal );
+
+    resultAngle = directionAngle + normalAngle;
+    resultAngle.setX( resultAngle.x() - M_PI/2 );
+
+    return angle_to_direction( resultAngle.x(), resultAngle.y() );
+
+}
+
+inline vec3 getRandomUpDirection(){
+ 
+    float A, B, B_sqrt, A_2pi;
+    
+    A = randf();
+    B = randf();
+    
+    A_2pi = 2 * M_PI * A;
+    B_sqrt = sqrt( B );
+
+    return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, sqrt( 1 - B ) ) ;
+}
+
+
+inline vec3 getRandomDirection( float lowerTheta , float upperTheta,
+                                float lowerPhi   , float upperPhi   ){
+
     float theta, phi;
-    theta = 2 * M_PI * (float)rand()/(float)RAND_MAX;
-    phi   = M_PI     * float( rand() ) / (float)RAND_MAX ;
+
+    theta = lowerTheta + ( upperTheta - lowerTheta)
+            * (float)rand()/(float)RAND_MAX;
+    phi   = lowerPhi + ( upperPhi - lowerPhi)
+            * float( rand() ) / (float)RAND_MAX ;
 
     return angle_to_direction( theta, phi );
 }
+
 
 //this is a really stupid, but very easy way of getting a random vector
 //on the hemisphere.
@@ -253,40 +455,30 @@ inline vec3 randomHemisphereDirection( const vec3 & normal ){
 }
 
 
-inline vec3 getRandomDirection( float lowerTheta , float upperTheta,
-                                float lowerPhi   , float upperPhi   ){
-
-    float theta, phi;
-    theta = lowerTheta + ( upperTheta - lowerTheta)
-            * (float)rand()/(float)RAND_MAX;
-    phi   = lowerPhi + ( upperPhi - lowerPhi)
-            * float( rand() ) / (float)RAND_MAX ;
-
-    return angle_to_direction( theta, phi );
-}
-
-
+//all of these rays should point out of the surface
 inline float phongDiffuse( const vec3 & direction_to_light,
                            const vec3 & normal){
     return std::max( normal.dotProduct( normal, direction_to_light ), 0.0 );
 }
 
+
+//all of these rays should point out of the surface
 inline float phongSpecular( const vec3 & direction_to_light,
                             const vec3 & normal,
                             const vec3 & view,
                             float shinyness) {
 
-    vec3 reflection = reflect( -direction_to_light, normal);
+    vec3 reflection = reflect( direction_to_light, normal);
 
     return pow( std::max( view.dotProduct(view, reflection) , 0.0 ) , shinyness);
 }
+
 
 inline void clampTop( vec3 & vec, float top ){
     if ( vec.x() > top ){ vec.setX( top ) ; }
     if ( vec.y() > top ){ vec.setY( top ) ; }
     if ( vec.z() > top ){ vec.setZ( top ) ; }
-}
-    
+}    
     
 
 }//namespace

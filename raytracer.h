@@ -34,6 +34,7 @@ private:
     QHash<QString, vec3> m_colors;
     int maxDepth;
     PhotonMapper p_map;
+    bool print;
 
     /* Hash table mapping material names to material structs.
      * materials["current_"] is a special entry refering to the
@@ -50,30 +51,35 @@ private:
      * using m_materials to load/store/modify current and other maps */
     void parseMat(const std::vector<std::string>& words);
 
+    //parse a light type
+    void parseLight(const std::vector<std::string>& words);
+
     /* convert from 0-1 rgb space to 0-255 */
     cs40::RGBColor convertColor( vec3& clr);
 
-    vec3 traceOnce( const cs40::Ray & incidentRay, int shapeIndex, int step );
+    vec3 traceOnce( const cs40::Ray & incidentRay, int shapeIndex, int depth );
 
     //does the phong coloration.
     //also takes care of shadowing.
-    vec3 phong( const cs40::Ray & incidentRay ,
-                vec3 & normal,
-                vec3 & hitPoint,
+    vec3 directLighting( const cs40::Ray & incidentRay ,
+                const vec3 & normal,
+                const vec3 & hitPoint,
                 int shapeIndex);
 
-    /* takes an incident ray and a normal vector and comutes a
-     * reflection ray.
-    vec3 reflect( const vec3 & incidentRay,
-                  const vec3 & normal );
+    vec3 phongDiffAndSpec(const cs40::Ray & incidentRay ,
+                                 const vec3 & normal,
+                                 vec3 & direction_to_light,
+                                 const cs40::Material & material,
+                                 int lightIndex );
+    vec3 brdfLighting(const cs40::Ray & incidentRay ,
+                                 const vec3 & normal,
+                                 vec3 & direction_to_light,
+                                 const cs40::Material & material,
+                                 int lightIndex );
 
-    vec3 transmit(const vec3 & direction, const vec3 & normal,
-                 float n1, float n2 );
 
-    inline float fresnel( const vec3 & direction, const vec3 & normal,
-                          float n1, float n2 );
-*/
-
+    vec3 rayCast( const cs40::Ray & incidentRay, int shapeIndex, int depth );
+    
     void loadModel( char * objectFile );
     
     void getPhotonMap();

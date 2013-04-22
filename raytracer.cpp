@@ -47,11 +47,13 @@ using cs40::View;
 //get stuck? use the nuclear option..
 //using namespace cs40;
 
+#define imax(a,b) (a>b?a:b)
 
 RayTracer::RayTracer(){
     /* do nothing? */
-    maxDepth = 0;
+    maxDepth = 5;
     srand( time(NULL));
+    print = false;
 }
 
 RayTracer::~RayTracer(){
@@ -72,8 +74,9 @@ void RayTracer::trace(RGBImage & img){
     cout << "Finished Photon Mapping" << endl;
 
     for ( float i = 0.0; i < m_scene.view.ncols; i += 1.0 ){
-        for ( float j = 0.0; j < m_scene.view.nrows; j += 1.0 ){
+        if (print ){ cout << "Pixel i : " << i << "\n"; }
 
+        for ( float j = 0.0; j < m_scene.view.nrows; j += 1.0 ){
             Ray viewRay;
             viewRay.origin = m_scene.view.eye;
 
@@ -85,6 +88,7 @@ void RayTracer::trace(RGBImage & img){
             viewRay.direction.normalize();
 
             vec3 color (traceOnce( viewRay , -1 , 0 ) );
+            //vec3 color (rayCast( viewRay , -1 , 0 ) );
             img( m_scene.view.nrows - int(j) - 1, int(i) ) = 
                                         convertColor( color );
         }
@@ -125,7 +129,7 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
     if ( incidentRay.isInsideObject ){ normal *= -1; }
 
     //get the phong lighting modelling.
-    local = phong( incidentRay , normal, hitPoint, shapeIndex );
+    local = directLighting( incidentRay , normal, hitPoint, shapeIndex );
 
     //get the reflection ray and recurse if the 
     //material has reflection properties
@@ -186,66 +190,175 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
     transmittedLight *= collidedObject->material.transmission;
 
     local *= collidedObject->material.local;
+
     vec3 indirect = p_map.getIllumination( hitPoint, 
                                           incidentRay.direction,
                                           normal,
                                           collidedObject->material );
-    return indirect ; //local + reflectedLight + transmittedLight ; //+ indirect;
+    return indirect + local + reflectedLight + transmittedLight;
 }
 
 
-
-vec3 RayTracer::phong(const Ray & incidentRay ,
-                            vec3 & normal,
-                            vec3 & hitPoint,
+vec3 RayTracer::directLighting(const Ray & incidentRay ,
+                            const vec3 & normal,
+                            const vec3 & hitPoint,
                             int shapeIndex ){
 
     Material material = m_scene.objects[ shapeIndex ]->material;
-    vec3 viewRay = incidentRay.direction * -1;
 
-    vec3 specular, diffuse;
+    vec3 diff_spec( 0, 0, 0 );
+    vec3 direction_to_light;
+    Ray lightRay;
+    lightRay.origin = hitPoint;
 
     //iterate over each of the lights to see if the item is is shadow.
     for ( int i = 0; i < m_scene.lights.size(); i ++ ){
+        if( m_scene.lights[i].type == RECTANGLE ){
+            vec3 lightPos, lightVal;
+            float increment = 0.1;
 
-        Ray lightRay;
-        lightRay.origin = hitPoint;
-        lightRay.direction = m_scene.lights[i].position - hitPoint;
+            for ( float j = 0.1; j <= 1.0; j += increment ){
+                for( float k = 0.1; k <= 1.0; k += increment ){
 
-        float time = m_scene.collisionTime( lightRay, shapeIndex );
+                    lightPos = m_scene.lights[i].position +
+                               m_scene.lights[i].basis1 * j +
+                               m_scene.lights[i].basis2 * k;
 
-        //the ray has hit an object before the light source
-        //reset the diffuse and specular components to zero
-        if ( time < 1.0 ){
-          continue;
+                    direction_to_light = lightPos - hitPoint;
+                    lightRay.direction = direction_to_light;
+                    if ( !(m_scene.isObstructed( lightRay, shapeIndex )) ){
+                        lightVal += brdfLighting( incidentRay,
+                                           normal, 
+                                           direction_to_light,
+                                           material,
+                                           i );
+                    }
+                }
+            }
+            //these following lines attenuate the intensity of the light based on
+            //the difference in angle between the normal of the light and the
+            //direction from the light to the hitPoint.
+            vec3 lightCenter =  m_scene.lights[i].position +
+                               m_scene.lights[i].basis1 * 0.5 +
+                               m_scene.lights[i].basis2 * 0.5;
+            vec3 direction_to_center = lightCenter - hitPoint;
+            direction_to_center.normalize();
+            float attenuation =  normal.dotProduct(  direction_to_center,
+                                                     m_scene.lights[i].normal);
+            lightVal *= imax( attenuation, 0 );
+
+            diff_spec += lightVal * increment * increment;
         }
 
 
-        vec3 direction_to_light = m_scene.lights[i].position - hitPoint;
-        direction_to_light.normalize();
+        else{
+            direction_to_light = m_scene.lights[i].position - hitPoint;
+            lightRay.direction = direction_to_light;
 
-        vec3 reflection = reflect( -direction_to_light, normal);
-
-
-        //diffuse
-        double k_diffuse = std::max(
-                           normal.dotProduct( normal, direction_to_light ), 0.0);
-        diffuse += m_scene.lights[i].intensity * k_diffuse * material.diffuse;
-
-        //specular
-        double k_specular = std::max(
-                            viewRay.dotProduct( viewRay, reflection) , 0.0 );
-
-        k_specular = pow( k_specular, 10); // material.shinyness );
-        specular += m_scene.lights[i].intensity * k_specular * material.specular;
-
+            //the ray has hit an object before the light source
+            //reset the diffuse and specular components to zero
+            if ( !(m_scene.isObstructed( lightRay, shapeIndex )) ){
+                diff_spec += brdfLighting( incidentRay,
+                                               normal, 
+                                               direction_to_light,
+                                               material,
+                                               i );
+            }
+        }
     }
 
-    vec3 ambient = m_scene.ambient * material.ambient;
-    vec3 color = diffuse + specular + ambient;
+    //vec3 ambient = m_scene.ambient * material.ambient;
+
+    return diff_spec;
+}
+
+vec3 RayTracer::phongDiffAndSpec(const Ray & incidentRay ,
+                                 const vec3 & normal,
+                                 vec3 & direction_to_light,
+                                 const Material & material,
+                                 int lightIndex ){
+
+    float k_diff, k_spec;
+    vec3 color;
+
+    direction_to_light.normalize();
+
+    k_diff = phongDiffuse( direction_to_light, normal );
+    k_spec = phongSpecular( direction_to_light, normal,
+                            incidentRay.direction, 10 );
+
+    color =  m_scene.lights[ lightIndex ].intensity * k_diff * material.diffuse;
+    color += m_scene.lights[ lightIndex ].intensity * k_spec * material.specular;
 
     return color;
 }
+
+vec3 RayTracer::brdfLighting( const Ray & incidentRay ,
+                                 const vec3 & normal,
+                                 vec3 & direction_to_light,
+                                 const Material & mat,
+                                 int lightIndex ){
+
+    direction_to_light.normalize();
+    float brdfVal = brdf( mat.alpha, mat.beta, direction_to_light,
+                                                 -incidentRay.direction, 
+                                                 normal );
+    return m_scene.lights[ lightIndex ].intensity * brdfVal * mat.ambient;
+}
+
+
+//TODO this is not even started
+vec3 RayTracer::rayCast( const Ray & incidentRay, int shapeIndex, int depth ){
+    
+    //the point of intersection with an object
+    vec3 hitPoint;                                
+
+    //get the closest colliding shape and set the hitpoint
+    shapeIndex = m_scene.checkIntersection( incidentRay, shapeIndex, hitPoint);
+
+    //return if there is no intersection
+    if (shapeIndex < 0 ){
+        return m_scene.view.background;
+    }
+
+
+    Shape * collidedObject = m_scene.objects[ shapeIndex ]; 
+    Material mat = collidedObject->material;
+
+    // get the current object
+
+    //get the normal to calculate phong, reflection, and transmission
+    vec3 normal = collidedObject->normal( hitPoint );
+
+    //reverse the direction of the normal if the vector is going the wrong way.
+
+    vec3 direction, color, total_color;
+    float increment = 0.1;
+    for( float i = 0; i <= 1.0; i += increment ){
+        for( float j = 0; j <= 1.0; j += increment ){
+            direction = mapToHemisphericalDirection( i, j, normal );
+            Ray castRay( hitPoint, direction );
+
+            //change this to be more dynamic
+            color = traceOnce( castRay, shapeIndex, maxDepth - 1 );
+            color *= brdf( mat.alpha, mat.beta,  direction,
+                                                 -incidentRay.direction, 
+                                                 normal );
+            total_color += color;
+        }
+    }
+    total_color *= increment * increment ;
+
+
+    vec3 direct = directLighting( incidentRay , normal, hitPoint, shapeIndex );
+    vec3 indirect = p_map.getIllumination( hitPoint, 
+                                          incidentRay.direction,
+                                          normal,
+                                          mat );
+
+    return total_color + direct + indirect; 
+}
+
 
 void RayTracer::save(){
     View vw = m_scene.view;
@@ -317,13 +430,13 @@ void RayTracer::parseLine(const vector<string>& words){
         m_scene.view.ncols = parseInt(words[2]);
     }
     else if (cmd == "origin"){
-        m_scene.view.origin = vec3(parseInt(words[1]),parseInt(words[2]),parseInt(words[3]));
+        m_scene.view.origin = parseVec3( words, 1 );
     }
     else if (cmd == "horiz"){
-        m_scene.view.horiz = vec3(parseInt(words[1]),parseInt(words[2]),parseInt(words[3]));
+        m_scene.view.horiz = parseVec3( words, 1 );
     }
     else if (cmd == "vert"){
-        m_scene.view.vert = vec3(parseInt(words[1]),parseInt(words[2]),parseInt(words[3]));
+        m_scene.view.vert = parseVec3( words, 1 );
     }
     else if (cmd == "eye"){
         checksize(words,3);
@@ -346,37 +459,35 @@ void RayTracer::parseLine(const vector<string>& words){
     else if (cmd == "sphere"){
         checksize(words, 4);
 
-        vec3 center( parseFloat(words[1]), parseFloat(words[2]), parseFloat(words[3]) );
-        cout << "sphere center:" << center << endl;
-        Sphere* object = new Sphere(center, parseFloat(words[4]), m_materials["current_"]);
+        vec3 center = parseVec3( words, 1);
+        Sphere* object = new Sphere(center, parseFloat(words[4]),
+                             m_materials["current_"]);
         m_scene.objects.push_back(object);
     }
     else if (cmd == "rectangle"){
         checksize(words, 9);
-        vec3 ll ( parseFloat(words[1]),parseFloat(words[2]),parseFloat(words[3]) );
-        vec3 lr ( parseFloat(words[4]),parseFloat(words[5]),parseFloat(words[6]) );
-        vec3 ur ( parseFloat(words[7]),parseFloat(words[8]),parseFloat(words[9]) );
+        vec3 ll = parseVec3( words, 1 );
+        vec3 lr = parseVec3( words, 4 );
+        vec3 ur = parseVec3( words, 7 );
         Rectangle* object = new Rectangle(ll, lr, ur, m_materials["current_"]);
         m_scene.objects.push_back(object);
     }
     else if (cmd == "triangle"){
         checksize(words,9);
-        vec3 pt1 ( parseFloat(words[1]),parseFloat(words[2]),parseFloat(words[3]) );
-        vec3 pt2 ( parseFloat(words[4]),parseFloat(words[5]),parseFloat(words[6]) );
-        vec3 pt3 ( parseFloat(words[7]),parseFloat(words[8]),parseFloat(words[9]) );
+        vec3 pt1 = parseVec3( words, 1 );
+        vec3 pt2 = parseVec3( words, 4 );
+        vec3 pt3 = parseVec3( words, 7 );
         Triangle* object = new Triangle(pt1,pt2, pt3, m_materials["current_"]);
         m_scene.objects.push_back(object);
     }
+
     else if (cmd == "amblight"){
         checksize(words,1);
         m_scene.ambient = parseFloat(words[1]);
     }
     else if (cmd == "light"){
-        checksize(words,4);
-        Light light;
-        light.position = parseVec3(words,1);
-        light.intensity = parseFloat(words[4]);
-        m_scene.lights.push_back(light);
+        //checksize(words,4);
+        parseLight( words );
     }
     else if ( cmd == "reflect"){
         checksize( words, 1);
@@ -403,6 +514,61 @@ void RayTracer::parseLine(const vector<string>& words){
 
     else{
         throw parser_error("Unknown command: "+cmd);
+    }
+}
+
+/* parse a material command in the vector words, 
+ * using matmap to load/store/modify current and other maps */
+void RayTracer::parseLight(const vector<string>& words){
+
+    float intensity = parseFloat(words[2]);
+
+
+    //we have a more complex type of light
+    if ( words[1] == "point"){
+        vec3 position = parseVec3(words,3); 
+        Light light( position, intensity );
+        m_scene.lights.push_back( light );
+    }
+
+    else if ( words[1] == "rectangle"){
+        vec3 ll, ul, ur;
+        ll = parseVec3( words, 3 );
+        ul = parseVec3( words, 6 );
+        ur = parseVec3( words, 9 );
+        
+        Light light( ll, ul, ur, intensity, RECTANGLE );
+        m_scene.lights.push_back( light );
+    }
+    else if ( words[1] == "triangle"){
+
+        vec3 ll, ul, ur;
+        ll = parseVec3( words, 3 );
+        ul = parseVec3( words, 6 );
+        ur = parseVec3( words, 9 );
+        
+        Light light( ll, ul, ur, intensity, TRIANGLE );
+        m_scene.lights.push_back( light );
+        
+    }
+    else if ( words[1] == "circle"){
+
+        vec3 position = parseVec3( words, 3 );
+        float radius = parseFloat( words[6] );
+        vec3 normal  = parseVec3( words, 7 );
+        Light light( position, intensity, radius, normal, CIRCLE );
+        m_scene.lights.push_back( light );
+        
+    }
+    else if ( words[1] == "sphere"){
+        vec3 position = parseVec3( words, 3 );
+        float radius = parseFloat( words[6] );
+        Light light( position, intensity, radius, SPHERE );
+        m_scene.lights.push_back( light );
+        
+    }
+    else{
+        throw parser_error("No command found for light");
     }
 }
 
@@ -448,6 +614,7 @@ void RayTracer::parseMat(const vector<string>& words){
 
 
 void RayTracer::getPhotonMap(){
+    m_scene.createLightMapping();
     p_map.mapScene( m_scene );
 
 }
@@ -471,6 +638,7 @@ void RayTracer::loadModel( char * objectFile )
     glmFacetNormals(objmodel_ptr);
     glmVertexNormals(objmodel_ptr, 90.0);
 }
+
 
 /*After this code is executed, the model will have been loaded, 
  * normals will have been created and smoothed, and the model will be
