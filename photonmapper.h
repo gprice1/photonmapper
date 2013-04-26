@@ -29,28 +29,31 @@ public:
 
     void mapScene( const Scene &scene );
 
-    //bool checkIntersection( Photon * photon,
-    //                         vec3 & origin,
-    //                         Scene & scene );
 
     vec3 getIllumination( const vec3 & point,
                           const vec3 & incident,
                           const vec3 & normal,
                           const cs40::Material & mat );
 
-    int total_indirect, total_caustic;
+    //this function returns 1 if the point is totally illuminated,
+    //                      0 if the point is imperfectly illuminated,
+    //                      -1 if the point is totally shadowed.
+    int isInShadow( const vec3 & point );
+
+
+    int total_indirect, total_caustic, total_shadow;
     
     float epsilon;
     
     //the numnber of nearest neighbors.
-    int N;
+    int caustic_N, shadow_N, indirect_N;
     //the range of photon collection if both this, and N are non-zero, then
     //the program will use KNN rather than in range.
     float range;
-
+    
     float caustic_power, indirect_power;
 
-    bool print;
+    bool print, visualize;
 
     
 private:
@@ -58,15 +61,21 @@ private:
 //_________________________Private Variables__________________________________
     KDTree indirect_tree;
     KDTree caustic_tree;
+    KDTree shadow_tree;
     
     KDTree::kd_point * indirect_positions;
     KDTree::kd_point * caustic_positions;
+    KDTree::kd_point * shadow_positions;
     
     //stores the other data about the photons
     vector<Photon *> indirect_photons;
     vector<Photon *> caustic_photons;
+    bool * isShadow;  //this array will store whether the photon is a shadow
+                      //or illumination photon.
 
-    int current_indirect, current_caustic;
+    int current_indirect, current_caustic, current_shadow, indirect_emitted;
+
+
 
 //___________________________Private Functions________________________________
     void build();
@@ -81,6 +90,8 @@ private:
     void addCaustic( const vec3 & direction, const vec3 & hitPoint,
                      const vec3 & incidentColor );
 
+    void addShadow( const vector<vec3> & intersectionPoints );
+
     inline KDTree::kd_point vec3_to_kdPoint( const vec3 & vector );
 
 
@@ -94,11 +105,12 @@ private:
                                  const vec3 & normal,
                                  const cs40::Material & mat );
 
+
     void kdTest();
 
     vec3 visualizePhotons( const vec3 & point , float clearance);
     
-    inline vec3 brdf( const cs40::Photon * photon, const vec3 & normal,
+    inline vec3 brdfLight( const cs40::Photon * photon, const vec3 & normal,
                                                    const vec3 & incident,
                                                    const cs40::Material & mat);
     inline vec3 phong( const cs40::Photon * photon,

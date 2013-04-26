@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 2.8.0)
-set(CMAKE_CXX_FLAGS "-g -Wall")
+set(CMAKE_CXX_FLAGS "-g -Wall -O3")
 set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules) #for FindGLEW.cmake
 
 FIND_PACKAGE(OpenGL REQUIRED) #for graphics
@@ -39,7 +39,7 @@ add_library(rtrace ${HDRS} ${LIBSRCS})
 
 
 SET(MYLIBS ${EXT_LIBS} )
-#add_executable(profiler profiler.cpp)
+add_executable(profiler profiler.cpp)
 
 add_executable(makescene ${HDRS} makescene.cpp)
 
@@ -50,7 +50,7 @@ add_executable(makescene ${HDRS} makescene.cpp)
 set(ALLLIBS rtrace ${EXT_LIBS} ${PNG_LIBRARIES} geom_lib parse_lib
                                                  png_lib)
 target_link_libraries(makescene ${ALLLIBS})
-#target_link_libraries(profiler ${ALLLIBS})
+target_link_libraries(profiler ${ALLLIBS})
 
 symlink_data(raytracer *.txt)
 

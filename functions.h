@@ -364,33 +364,31 @@ inline vec3 angle_to_direction( float theta, float phi ){
 
 }
 
+//the x component is theta, the zenith angle and the y component is phi, the
+//azimuth angle
 inline vec2 direction_to_angle( const vec3 & direction ){
     vec2 theta_phi;
-    theta_phi.setX( atan2( direction.y() , direction.x() ) );
-    theta_phi.setY( acos( direction.z() ) );
+    theta_phi.setX( acos( direction.z() ) );
+    theta_phi.setY( atan2( direction.y() , direction.x() ) );
+    
     return theta_phi;
 }
 
 
 inline vec3 getRandomDirection(){
 
-    int top_or_bottom = (rand() % 2);
     
-    float A, B, B_sqrt, A_2pi;
+    float A, B, B_2, B_sqrt;
     
-    A = randf();
-    B = randf();
+    A = randf( 0, 2 * M_PI);
+    B = randf(-1 , 1);
     
-    A_2pi = 2 * M_PI * A;
-    B_sqrt = sqrt( B );
+    B_2 = B * B;
+    B_sqrt = sqrt( 1 - B_2 );
 
-    //if it comes out bottom, then multiply the z component by -1
-    if ( top_or_bottom ){
-        return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, -sqrt( 1 - B ) ) ;
-    }
-
-    return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, sqrt( 1 - B ) ) ;
+    return vec3( cos(A)*B_sqrt,  sin(A)*B_sqrt,  B ) ;
 }
+
 
 //this maps from the unit square to vectors on the unit circle
 inline vec3 mapToHemisphere( float A, float B ){
@@ -399,6 +397,7 @@ inline vec3 mapToHemisphere( float A, float B ){
 
     return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, sqrt( 1 - B ) ) ;
 }
+
 
 inline vec3 mapToHemisphericalDirection( float A, float B, const vec3 & normal ){
 
@@ -415,6 +414,7 @@ inline vec3 mapToHemisphericalDirection( float A, float B, const vec3 & normal )
 
 }
 
+
 inline vec3 getRandomUpDirection(){
  
     float A, B, B_sqrt, A_2pi;
@@ -428,20 +428,53 @@ inline vec3 getRandomUpDirection(){
     return vec3( cos( A_2pi )*B_sqrt, sin( A_2pi ) * B_sqrt, sqrt( 1 - B ) ) ;
 }
 
+//this generates a random, cosine weighted sample of point on the unit sphere.
+//the wieghting favors the point ( 0, 0, 1)
+inline vec3 cosWeightedHemisphere( ){
+    float A = randf();
+    float B = randf();
 
-inline vec3 getRandomDirection( float lowerTheta , float upperTheta,
-                                float lowerPhi   , float upperPhi   ){
+    float r = sqrt( A );
+    float phi = 2 * M_PI * B;
 
-    float theta, phi;
-
-    theta = lowerTheta + ( upperTheta - lowerTheta)
-            * (float)rand()/(float)RAND_MAX;
-    phi   = lowerPhi + ( upperPhi - lowerPhi)
-            * float( rand() ) / (float)RAND_MAX ;
-
-    return angle_to_direction( theta, phi );
+    vec3 direction;
+    direction.setX( r * cos( phi ));
+    direction.setY( r * sin( phi ));
+    direction.setZ( sqrt( 1.0 - A ));
+    
+    return direction;
 }
 
+
+//TODO this is incomplete.
+inline vec3 cosWeightedRandomHemisphereDirection( const vec3 & normal ){
+
+    vec3 randomDirection;
+    //get two basis vectors for the circle in the plane of the hemisphere.
+    do {
+        randomDirection = vec3 ( rand(), rand(), rand() );
+    }while ( normal.dotProduct( randomDirection, normal) == 0);
+
+    vec3 basis1, basis2;
+    basis1 = normal.crossProduct( normal,
+                    normal.crossProduct( randomDirection, normal ) );
+    basis1.normalize();
+
+    basis2 = normal.crossProduct( normal, basis1 );
+
+
+    float A = randf();
+    float B = randf();
+
+    float r = sqrt( A );
+    float phi = 2 * M_PI * B;
+
+    vec3 direction = normal * sqrt( 1.0 - A );    
+    direction     += basis1 * r * sin( phi );
+    direction     += basis2 * r * cos( phi );
+    
+    return direction;
+}
 
 //this is a really stupid, but very easy way of getting a random vector
 //on the hemisphere.
@@ -453,6 +486,7 @@ inline vec3 randomHemisphereDirection( const vec3 & normal ){
         }
     }
 }
+
 
 
 //all of these rays should point out of the surface
@@ -480,6 +514,22 @@ inline void clampTop( vec3 & vec, float top ){
     if ( vec.z() > top ){ vec.setZ( top ) ; }
 }    
     
+//this is a gaussian filter that makes castic rendering more accurate.
+inline float gaussianFilter(float distSqrd, float maxDistSqrd ){
+    float alpha, beta;
+    alpha = 0.918;
+    beta = 1.953;
+
+    float top, bottom, filterVal;
+
+    top = 1 - exp( -beta * distSqrd / ( 2 * maxDistSqrd ) );
+    bottom = 1 - exp( -beta );
+
+    filterVal = alpha * ( 1 - top/bottom );
+
+    return filterVal;
+}
+
 
 }//namespace
 

@@ -26,8 +26,15 @@ public:
     std::vector<cs40::Shape*> objects;  //things to raytrace
 
     int checkIntersection( const cs40::Ray & incidentRay, 
-                           int shapeIndex, 
+                           int shapeIndex,
                            vec3 & hitPoint ) const;
+
+    //takes a reference to a vector and stores all of the hitpoints in this 
+    //vector.
+    //returns the shape index.
+    int checkAllIntersections( const cs40::Ray & incidentRay, 
+                               std::vector< vec3 > & intersections ) const;
+
 
     float collisionTime(const cs40::Ray & incidentRay, int shapeIndex ) const;
     bool  isObstructed( const cs40::Ray & incidentRay, int shapeIndex ) const;
@@ -37,6 +44,12 @@ public:
     cs40::Ray emitPhoton( ) const ;
 
     void createLightMapping( );
+
+    vec3 getDirect( const vec3 & view,
+                     const vec3 & normal,
+                     const vec3 & hitPoint,
+                     int shapeIndex, int lightIndex,
+                     bool checkForIntersections=true );
 
 };
 

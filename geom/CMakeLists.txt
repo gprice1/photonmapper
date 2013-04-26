@@ -9,7 +9,7 @@ set(HDRS
 
 set(LIBSRCS common.cpp  scene.cpp ray.cpp 
     sphere.cpp rectangle.cpp triangle.cpp
-    photon.cpp light.cpp )
+    photon.cpp light.cpp material.cpp )
    
 add_library(geom_lib ${HDRS} ${LIBSRCS})
 

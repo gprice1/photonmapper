@@ -29,6 +29,9 @@ public:
     /* Save output image */
     void save();
 
+    bool get_indirect, get_direct, get_reflect , get_raycast, get_caustic;
+
+
 private:
     cs40::Scene m_scene;
     QHash<QString, vec3> m_colors;
@@ -59,26 +62,20 @@ private:
 
     vec3 traceOnce( const cs40::Ray & incidentRay, int shapeIndex, int depth );
 
-    //does the phong coloration.
-    //also takes care of shadowing.
-    vec3 directLighting( const cs40::Ray & incidentRay ,
-                const vec3 & normal,
-                const vec3 & hitPoint,
-                int shapeIndex);
-
-    vec3 phongDiffAndSpec(const cs40::Ray & incidentRay ,
-                                 const vec3 & normal,
-                                 vec3 & direction_to_light,
-                                 const cs40::Material & material,
-                                 int lightIndex );
-    vec3 brdfLighting(const cs40::Ray & incidentRay ,
-                                 const vec3 & normal,
-                                 vec3 & direction_to_light,
-                                 const cs40::Material & material,
-                                 int lightIndex );
+    vec3 reflect( const cs40::Ray & incidentRay,
+                     const vec3 & hitPoint,
+                     const vec3 & normal,
+                     const Material & mat,
+                     int shapeIndex,
+                     int depth );
 
 
-    vec3 rayCast( const cs40::Ray & incidentRay, int shapeIndex, int depth );
+    vec3 rayCast(const vec3 & view,
+                 const vec3 & hitPoint,
+                 const vec3 & normal,
+                 const Material & mat,
+                 int shapeIndex,
+                 int depth );
     
     void loadModel( char * objectFile );
     

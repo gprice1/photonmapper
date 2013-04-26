@@ -51,9 +51,19 @@ using cs40::View;
 
 RayTracer::RayTracer(){
     /* do nothing? */
-    maxDepth = 5;
+    maxDepth = 4;
     srand( time(NULL));
+
+    //do you want to print the current row?
     print = false;
+
+    //what types of lighting do I want to happen?
+    get_indirect = true;
+    get_direct  = true;
+    get_reflect = true;
+    get_raycast = false;
+    get_caustic = false;
+
 }
 
 RayTracer::~RayTracer(){
@@ -69,9 +79,12 @@ RayTracer::~RayTracer(){
  */
 void RayTracer::trace(RGBImage & img){
 
-    cout << "Starting Photon Mapping " << endl;
-    getPhotonMap();
-    cout << "Finished Photon Mapping" << endl;
+    //
+    if (get_indirect || get_direct || get_caustic){
+        cout << "Starting Photon Mapping " << endl;
+        getPhotonMap();
+        cout << "Finished Photon Mapping" << endl;
+    }
 
     for ( float i = 0.0; i < m_scene.view.ncols; i += 1.0 ){
         if (print ){ cout << "Pixel i : " << i << "\n"; }
@@ -96,7 +109,7 @@ void RayTracer::trace(RGBImage & img){
 }
 
 /* traceOnce -  Recursive helper function that takes in an incidentRay
- *               and the current shape index of the ray.
+ *              and the current shape index of the ray.
  *              The depth is incremented by 1 for every recursive call.
  *              This returns a color based on the phong lighting model, 
  *              reflection, and transmission.
@@ -106,8 +119,6 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
     //if the recursion depth has been maxed, then return the bg color
     if (depth > maxDepth ){ return m_scene.view.background ; }
 
-    //colors for the local, reflected, and transmitted light
-    vec3 local, reflectedLight, transmittedLight;
 
     //the point of intersection with an object
     vec3 hitPoint;                                
@@ -120,20 +131,75 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
         return m_scene.view.background;
     }
 
-    Shape * collidedObject = m_scene.objects[ shapeIndex ]; 
-    // get the current object
+    // get the current object    
+    Shape * collidedObject = m_scene.objects[ shapeIndex ];
+    Material mat = collidedObject->material;
 
     //get the normal to calculate phong, reflection, and transmission
     vec3 normal = collidedObject->normal( hitPoint );
     //reverse the direction of the normal if the vector is going the wrong way.
     if ( incidentRay.isInsideObject ){ normal *= -1; }
 
-    //get the phong lighting modelling.
-    local = directLighting( incidentRay , normal, hitPoint, shapeIndex );
+    vec3 directLight(0,0,0)   , reflectedLight(0,0,0);
+    vec3 indirectLight(0,0,0) , castLight(0,0,0);
 
+
+    if (get_direct){
+        int shadowVal = p_map.isInShadow( hitPoint );
+
+        //if the point is not totally in shadows, continue with the 
+        //direct lighting calculations
+        if ( shadowVal != -1 ){
+            bool checkForIntersections;
+
+            //if the point is totally illuminated
+            if ( shadowVal == 1){ checkForIntersections = false ; }
+            //if the point is partially illuminated
+            else if ( shadowVal == 0 ){ checkForIntersections = true; }
+
+            for ( int i = 0; i < m_scene.lights.size(); i ++ ){
+                directLight += m_scene.getDirect( incidentRay.direction, normal,
+                                                 hitPoint, shapeIndex, i,
+                                                 checkForIntersections );
+            }
+        }
+    }
+
+    if ( get_reflect ){
+        reflectedLight = reflect(incidentRay, hitPoint, normal,
+                                  mat, shapeIndex, depth );
+    }
+    if ( get_indirect ){
+        indirectLight = p_map.getIllumination( hitPoint, 
+                                          incidentRay.direction,
+                                          normal,
+                                          mat );
+    }
+    if (get_raycast && depth == 0){
+        castLight = rayCast(incidentRay.direction, hitPoint, 
+                            normal, mat, shapeIndex, depth );
+    }
+    if ( get_reflect && get_direct ){
+        float reflected_to_local = sqrt( mat.alpha );
+        directLight *= reflected_to_local;
+        reflectedLight *= (1 - reflected_to_local);
+    }
+
+    return directLight + reflectedLight + 1.4 * castLight + indirectLight ;
+}
+
+//TODO use importance sampling for the phong model.
+vec3 RayTracer::reflect(  const Ray & incidentRay,
+                             const vec3 & hitPoint,
+                             const vec3 & normal,
+                             const Material & mat,
+                             int shapeIndex,
+                             int depth ){
+
+    vec3 reflectedLight , transmittedLight;
     //get the reflection ray and recurse if the 
     //material has reflection properties
-    if ( collidedObject->material.reflection != 0.0){
+    if ( mat.alphaInv >= 0.11 ){
         vec3 reflection = cs40::reflect( incidentRay.direction, normal);
         Ray reflectionRay;
         reflectionRay.origin = hitPoint;
@@ -144,15 +210,14 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
 
     //if the material has transmission properties, 
     //get the transmission ray and recurse
-    if (collidedObject->material.transmission != 0.0 || 
-        collidedObject->material.refractionIndex != 0.0){
+    if ( mat.refractionIndex != 0.0){
         float n1, n2; 
         if (incidentRay.isInsideObject){
-            n1 = collidedObject->material.refractionIndex;
+            n1 = mat.refractionIndex;
             n2 = 1.0;
         }else {
             n1 = 1.0;
-            n2 = collidedObject->material.refractionIndex;
+            n2 = mat.refractionIndex;
         }
 
         Ray transmissionRay;
@@ -166,9 +231,10 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
             transmittedLight = traceOnce( transmissionRay,
                                           shapeIndex, depth + 1 );
         }
+
         float reflectance = cs40::fresnel( incidentRay.direction, normal, 
                                            n1, n2);
-        reflectedLight *= reflectance;
+        reflectedLight *= reflectance ;
         transmittedLight *= 1 - reflectance;
 
         if ( reflectance < 0 || reflectance > 1.0){
@@ -177,186 +243,36 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
             cout << "Total reflect: " << reflectedLight << "\n";
             cout << "Total transmit: " << transmittedLight << "\n";
         }
-        
-
-    }
-    else{
-    
-        reflectedLight  *= collidedObject->material.reflection;
-        transmittedLight *= collidedObject->material.transmission;
     }
 
-    reflectedLight  *= collidedObject->material.reflection;
-    transmittedLight *= collidedObject->material.transmission;
+    return (reflectedLight + transmittedLight ) * mat.alphaInv;
 
-    local *= collidedObject->material.local;
-
-    vec3 indirect = p_map.getIllumination( hitPoint, 
-                                          incidentRay.direction,
-                                          normal,
-                                          collidedObject->material );
-    return indirect + local + reflectedLight + transmittedLight;
 }
 
 
-vec3 RayTracer::directLighting(const Ray & incidentRay ,
-                            const vec3 & normal,
-                            const vec3 & hitPoint,
-                            int shapeIndex ){
+//TODO use importance sampling for the phong model.
+vec3 RayTracer::rayCast( const vec3 & view,
+                         const vec3 & hitPoint,
+                         const vec3 & normal,
+                         const Material & mat,
+                         int shapeIndex,
+                         int depth ){
 
-    Material material = m_scene.objects[ shapeIndex ]->material;
+    vec3 direction, color, indirect;
 
-    vec3 diff_spec( 0, 0, 0 );
-    vec3 direction_to_light;
-    Ray lightRay;
-    lightRay.origin = hitPoint;
+    int num_samples = 100;
+    for( int i = 0; i < num_samples; i ++){
+        direction = cosWeightedRandomHemisphereDirection( normal );
+        Ray castRay( hitPoint, direction );
 
-    //iterate over each of the lights to see if the item is is shadow.
-    for ( int i = 0; i < m_scene.lights.size(); i ++ ){
-        if( m_scene.lights[i].type == RECTANGLE ){
-            vec3 lightPos, lightVal;
-            float increment = 0.1;
-
-            for ( float j = 0.1; j <= 1.0; j += increment ){
-                for( float k = 0.1; k <= 1.0; k += increment ){
-
-                    lightPos = m_scene.lights[i].position +
-                               m_scene.lights[i].basis1 * j +
-                               m_scene.lights[i].basis2 * k;
-
-                    direction_to_light = lightPos - hitPoint;
-                    lightRay.direction = direction_to_light;
-                    if ( !(m_scene.isObstructed( lightRay, shapeIndex )) ){
-                        lightVal += brdfLighting( incidentRay,
-                                           normal, 
-                                           direction_to_light,
-                                           material,
-                                           i );
-                    }
-                }
-            }
-            //these following lines attenuate the intensity of the light based on
-            //the difference in angle between the normal of the light and the
-            //direction from the light to the hitPoint.
-            vec3 lightCenter =  m_scene.lights[i].position +
-                               m_scene.lights[i].basis1 * 0.5 +
-                               m_scene.lights[i].basis2 * 0.5;
-            vec3 direction_to_center = lightCenter - hitPoint;
-            direction_to_center.normalize();
-            float attenuation =  normal.dotProduct(  direction_to_center,
-                                                     m_scene.lights[i].normal);
-            lightVal *= imax( attenuation, 0 );
-
-            diff_spec += lightVal * increment * increment;
-        }
-
-
-        else{
-            direction_to_light = m_scene.lights[i].position - hitPoint;
-            lightRay.direction = direction_to_light;
-
-            //the ray has hit an object before the light source
-            //reset the diffuse and specular components to zero
-            if ( !(m_scene.isObstructed( lightRay, shapeIndex )) ){
-                diff_spec += brdfLighting( incidentRay,
-                                               normal, 
-                                               direction_to_light,
-                                               material,
-                                               i );
-            }
-        }
+        //change this to be more dynamic
+        color = traceOnce( castRay, shapeIndex, maxDepth - 1 );
+        color *= mat.getLight( direction, view, normal );
+        indirect += color;
     }
+    indirect /= num_samples;
 
-    //vec3 ambient = m_scene.ambient * material.ambient;
-
-    return diff_spec;
-}
-
-vec3 RayTracer::phongDiffAndSpec(const Ray & incidentRay ,
-                                 const vec3 & normal,
-                                 vec3 & direction_to_light,
-                                 const Material & material,
-                                 int lightIndex ){
-
-    float k_diff, k_spec;
-    vec3 color;
-
-    direction_to_light.normalize();
-
-    k_diff = phongDiffuse( direction_to_light, normal );
-    k_spec = phongSpecular( direction_to_light, normal,
-                            incidentRay.direction, 10 );
-
-    color =  m_scene.lights[ lightIndex ].intensity * k_diff * material.diffuse;
-    color += m_scene.lights[ lightIndex ].intensity * k_spec * material.specular;
-
-    return color;
-}
-
-vec3 RayTracer::brdfLighting( const Ray & incidentRay ,
-                                 const vec3 & normal,
-                                 vec3 & direction_to_light,
-                                 const Material & mat,
-                                 int lightIndex ){
-
-    direction_to_light.normalize();
-    float brdfVal = brdf( mat.alpha, mat.beta, direction_to_light,
-                                                 -incidentRay.direction, 
-                                                 normal );
-    return m_scene.lights[ lightIndex ].intensity * brdfVal * mat.ambient;
-}
-
-
-//TODO this is not even started
-vec3 RayTracer::rayCast( const Ray & incidentRay, int shapeIndex, int depth ){
-    
-    //the point of intersection with an object
-    vec3 hitPoint;                                
-
-    //get the closest colliding shape and set the hitpoint
-    shapeIndex = m_scene.checkIntersection( incidentRay, shapeIndex, hitPoint);
-
-    //return if there is no intersection
-    if (shapeIndex < 0 ){
-        return m_scene.view.background;
-    }
-
-
-    Shape * collidedObject = m_scene.objects[ shapeIndex ]; 
-    Material mat = collidedObject->material;
-
-    // get the current object
-
-    //get the normal to calculate phong, reflection, and transmission
-    vec3 normal = collidedObject->normal( hitPoint );
-
-    //reverse the direction of the normal if the vector is going the wrong way.
-
-    vec3 direction, color, total_color;
-    float increment = 0.1;
-    for( float i = 0; i <= 1.0; i += increment ){
-        for( float j = 0; j <= 1.0; j += increment ){
-            direction = mapToHemisphericalDirection( i, j, normal );
-            Ray castRay( hitPoint, direction );
-
-            //change this to be more dynamic
-            color = traceOnce( castRay, shapeIndex, maxDepth - 1 );
-            color *= brdf( mat.alpha, mat.beta,  direction,
-                                                 -incidentRay.direction, 
-                                                 normal );
-            total_color += color;
-        }
-    }
-    total_color *= increment * increment ;
-
-
-    vec3 direct = directLighting( incidentRay , normal, hitPoint, shapeIndex );
-    vec3 indirect = p_map.getIllumination( hitPoint, 
-                                          incidentRay.direction,
-                                          normal,
-                                          mat );
-
-    return total_color + direct + indirect; 
+    return indirect;
 }
 
 
@@ -424,6 +340,22 @@ void RayTracer::parseLine(const vector<string>& words){
         checksize(words,1);
         m_scene.view.fname = words[1];
     }
+    else if (cmd == "direct"){
+        get_direct = true;
+        cout << "Direct Lighting On" << "\n";
+    }
+    else if (cmd == "indirect"){
+        get_indirect = true;
+        cout << "Indirect Lighting On" << "\n";
+    }
+    else if (cmd == "raycast"){
+        get_raycast = true;
+        cout << "RayCasting On" << "\n";
+    }
+    else if (cmd == "reflect"){
+        get_reflect = true;
+        cout << "Reflection On" << "\n";        
+    }
     else if (cmd == "outsize"){
         checksize(words,2);
         m_scene.view.nrows = parseInt(words[1]);
@@ -489,23 +421,16 @@ void RayTracer::parseLine(const vector<string>& words){
         //checksize(words,4);
         parseLight( words );
     }
-    else if ( cmd == "reflect"){
+    else if ( cmd == "refract"){
         checksize( words, 1);
-        m_materials["current_"].reflection = parseFloat(words[1]);
+        m_materials["current_"].refractionIndex = parseFloat( words[1]);
     }
-    else if ( cmd == "transmit"){
-        checksize( words, 2);
-        m_materials["current_"].transmission = parseFloat( words[1]);
-        m_materials["current_"].refractionIndex = parseFloat( words[2]);
-    }
-    else if ( cmd == "local"){
-        checksize( words, 1);
-        m_materials["current_"].local = parseFloat( words[1]);
 
-    }
     else if ( cmd == "alpha"){
         checksize( words, 1);
-        m_materials["current_"].alpha = parseFloat(words[1]);
+        m_materials["current_"].alpha = parseFloat(words[1]); 
+        m_materials["current_"].alphaInv = 1 - parseFloat(words[1]); 
+
     }
     else if ( cmd == "beta"){
         checksize( words, 1);
@@ -587,7 +512,7 @@ void RayTracer::parseMat(const vector<string>& words){
             throw parser_error("No Material " + words[2] + " found");
         }
     }
-    else if(subcmd != "amb" && subcmd != "diff" && subcmd != "spec"){
+    else if(subcmd != "color"){
         throw parser_error("Unknown material subcommand: " + subcmd);
     }
     else{
@@ -606,9 +531,7 @@ void RayTracer::parseMat(const vector<string>& words){
                 throw parser_error("No color " + clrname + " found");
             }
         }
-        if(subcmd=="amb"){m_materials["current_"].ambient=clr;}
-        else if(subcmd=="diff"){m_materials["current_"].diffuse=clr;}
-        else if(subcmd=="spec"){m_materials["current_"].specular=clr;}
+        if(subcmd=="color"){m_materials["current_"].color=clr;}
     }
 }
 
