@@ -67,7 +67,7 @@ cs40::Ray Light::emitPhoton() const {
 
         case RECTANGLE :
             origin = position + basis1 * randf() + basis2 * randf() ;
-            direction = cosWeightedRandomHemisphereDirection( normal );
+            direction = randomHemisphereDirection( normal );
             break;
 
         case TRIANGLE :
@@ -77,7 +77,7 @@ cs40::Ray Light::emitPhoton() const {
             }while( A + B > 1.0 );
 
             origin = position + basis1 * A + basis2 * B ;
-            direction = cosWeightedRandomHemisphereDirection( normal );
+            direction = randomHemisphereDirection( normal );
             break;
 
         case CIRCLE :

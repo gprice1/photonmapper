@@ -9,6 +9,8 @@
 #include <vector>
 #include <iostream>
 #include "scene.h"
+#include <mutex>
+#include <thread>
 
 using std::vector;
 
@@ -40,6 +42,7 @@ public:
     //                      -1 if the point is totally shadowed.
     int isInShadow( const vec3 & point );
 
+//________________________Public Variable____________________________________
 
     int total_indirect, total_caustic, total_shadow;
     
@@ -51,9 +54,15 @@ public:
     //the program will use KNN rather than in range.
     float range;
     
-    float caustic_power, indirect_power;
+    float caustic_power, indirect_power, photon_power;
 
-    bool print, visualize;
+    bool print, visualize, exclude_direct;
+
+    int num_threads;
+
+    std::mutex caustic_lock;
+    std::mutex indirect_lock;
+    std::mutex shadow_lock;
 
     
 private:
@@ -73,7 +82,11 @@ private:
     bool * isShadow;  //this array will store whether the photon is a shadow
                       //or illumination photon.
 
-    int current_indirect, current_caustic, current_shadow, indirect_emitted;
+    int current_indirect, current_caustic, current_shadow;
+    int emitted_caustic, emitted_indirect;
+
+    int * caustic_emitted_array;
+    int * indirect_emitted_array;
 
 
 
@@ -105,7 +118,12 @@ private:
                                  const vec3 & normal,
                                  const cs40::Material & mat );
 
+    void threaded_mapScene( const cs40::Scene &scene, int threadID );
+    
+    void initThread();
 
+    void endThread();
+    
     void kdTest();
 
     vec3 visualizePhotons( const vec3 & point , float clearance);
@@ -117,6 +135,13 @@ private:
                                               const vec3 & normal,
                                               const vec3 & incident,
                                               const cs40::Material & mat);
+
+    inline vec3 getColor( const KDTree & tree, int N,
+                                         const vector< cs40::Photon *> & photons,
+                                         const vec3 & point,
+                                         const vec3 & normal,
+                                         const vec3 & incident,
+                                         const cs40::Material & mat);
 
 };
 

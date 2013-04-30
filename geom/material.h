@@ -32,6 +32,11 @@ public:
     vec3 getLight(const vec3 & incident,
                            const vec3 & outgoing,
                            const vec3 & normal    ) const ;
+
+    vec3 getCosLight(const vec3 & incident,
+                           const vec3 & outgoing,
+                           const vec3 & normal    ) const ;
+
 private:
 
     inline vec3 brdfLight( const vec3 & incident,

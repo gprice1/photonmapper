@@ -13,5 +13,4 @@ typedef QVector4D vec4;
 /* Print QVector3d objects using cout. */
 std::ostream& operator<<(std::ostream& str, const QVector3D& vec);
 
-
 #endif 

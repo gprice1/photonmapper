@@ -7,6 +7,7 @@
 #include <vector>
 #include <math.h>
 #include <typeinfo>
+#include <thread>
 
 //QT
 #include <QHash>      //Qt Dictionary
@@ -30,6 +31,7 @@
 
 #include "photonmapper.h"
 #include "kd-tree.h"
+
 
 using namespace cs40;
 using std::cout;
@@ -58,11 +60,13 @@ RayTracer::RayTracer(){
     print = false;
 
     //what types of lighting do I want to happen?
-    get_indirect = true;
-    get_direct  = true;
-    get_reflect = true;
+    get_indirect= true;
+    get_direct  = false;
+    get_reflect = false;
     get_raycast = false;
     get_caustic = false;
+
+    num_threads = 1;
 
 }
 
@@ -71,6 +75,21 @@ RayTracer::~RayTracer(){
         delete m_scene.objects[i];
     }
 }
+
+void RayTracer::threadedTrace( RGBImage & img, int threadID ){
+
+    for ( float i = threadID; i < m_scene.view.ncols; i += num_threads ){
+        for ( float j = 0.0; j < m_scene.view.nrows; j += 1.0 ){
+
+            vec3 color = tracePixel( i, j );
+
+            img( m_scene.view.nrows - int(j) - 1, int(i) ) = 
+                                        convertColor( color );
+        }
+    }
+}
+
+
 
 /* trace - iterates through all the pixels of our view box, traces the ray 
  * coming from the eye, and adjusts
@@ -86,26 +105,55 @@ void RayTracer::trace(RGBImage & img){
         cout << "Finished Photon Mapping" << endl;
     }
 
-    for ( float i = 0.0; i < m_scene.view.ncols; i += 1.0 ){
-        if (print ){ cout << "Pixel i : " << i << "\n"; }
+    //spawn threads in the multithreaded case
+    if ( num_threads > 1 ){
+        vector< std::thread > threads; 
 
-        for ( float j = 0.0; j < m_scene.view.nrows; j += 1.0 ){
-            Ray viewRay;
-            viewRay.origin = m_scene.view.eye;
+        //spawn threads.
+        for ( int i = 1; i < num_threads; i ++ ){
+            threads.emplace_back( &RayTracer::threadedTrace, this,
+                                      std::ref( img ), i );
+            //threads.emplace_back( threadedTrace, std::ref( img ), i );
+        }
+        //set the parent to doing stuff as well.
+        threadedTrace( std::ref( img ), 0 );
 
-            vec3 h_disp = m_scene.view.horiz * ( i / float(m_scene.view.ncols) );
-            vec3 v_disp = m_scene.view.vert * ( j / float(m_scene.view.nrows) );
-            vec3 pixel_position = m_scene.view.origin + h_disp + v_disp;
-
-            viewRay.direction = pixel_position - viewRay.origin;
-            viewRay.direction.normalize();
-
-            vec3 color (traceOnce( viewRay , -1 , 0 ) );
-            //vec3 color (rayCast( viewRay , -1 , 0 ) );
-            img( m_scene.view.nrows - int(j) - 1, int(i) ) = 
-                                        convertColor( color );
+        for( int i = 0; i < threads.size() ; i ++ ){
+            threads[i].join();
         }
     }
+
+    //trace each pixel in the non-multithreaded place
+    else{
+        for ( float i = 0.0; i < m_scene.view.ncols; i += 1.0 ){
+            if (print ){ cout << "Pixel i : " << i << "\n"; }
+
+            for ( float j = 0.0; j < m_scene.view.nrows; j += 1.0 ){
+
+                vec3 color = tracePixel( i, j );
+
+                img( m_scene.view.nrows - int(j) - 1, int(i) ) = 
+                                            convertColor( color );
+            }
+        }
+    }
+}
+
+//this traces a single pixel i,j. It takes floats, not integers so that
+//pixels can be traced more than once.
+vec3 RayTracer::tracePixel( float i, float j ){
+    Ray viewRay;
+    viewRay.origin = m_scene.view.eye;
+
+    vec3 h_disp = m_scene.view.horiz * ( i / float(m_scene.view.ncols) );
+    vec3 v_disp = m_scene.view.vert * ( j / float(m_scene.view.nrows) );
+    vec3 pixel_position = m_scene.view.origin + h_disp + v_disp;
+
+    viewRay.direction = pixel_position - viewRay.origin;
+    viewRay.direction.normalize();
+
+    return traceOnce( viewRay , -1 , 0 );
+
 }
 
 /* traceOnce -  Recursive helper function that takes in an incidentRay
@@ -185,7 +233,7 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
         reflectedLight *= (1 - reflected_to_local);
     }
 
-    return directLight + reflectedLight + 1.4 * castLight + indirectLight ;
+    return directLight + reflectedLight + castLight + indirectLight ;
 }
 
 //TODO use importance sampling for the phong model.
@@ -538,6 +586,7 @@ void RayTracer::parseMat(const vector<string>& words){
 
 void RayTracer::getPhotonMap(){
     m_scene.createLightMapping();
+    p_map.num_threads = num_threads;
     p_map.mapScene( m_scene );
 
 }

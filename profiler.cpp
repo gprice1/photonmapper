@@ -19,13 +19,14 @@ int main(){
                  M_PI * 2 / 0.02 +1,
                  convertColor( bgcolor ) );
 
-    float alpha, beta, brdfValue;
+    float alpha, beta, brdfValue, lightVal;
     alpha = 0.01;
     beta = 0.5;
 
     vec3 incoming, outgoing, normal; 
     incoming = angle_to_direction( M_PI/4, 0 );
     normal   = angle_to_direction( M_PI/2, 0 );
+    float cos_thetaI = cos( M_PI/4 );
     
     vec3 color;
     int k , l;
@@ -39,7 +40,8 @@ int main(){
 
             //cout << "outgoing: " << outgoing << "\n";
 
-            brdfValue = cs40::brdf_s( alpha, beta, incoming, outgoing, normal );
+            brdfValue = cs40::brdf( alpha, beta, incoming, outgoing, normal );
+            //brdfValue *= cos_thetaI;
 
             if ( brdfValue > 1.0 ){
                 cout << "\tBRDF value: " << brdfValue << "\n";

@@ -10,6 +10,7 @@
 #include "rgbColor.h"
 #include "rgbImage.h"
 #include "photonmapper.h"
+#include <thread>
 
 namespace cs40{
 
@@ -30,7 +31,7 @@ public:
     void save();
 
     bool get_indirect, get_direct, get_reflect , get_raycast, get_caustic;
-
+    int num_threads;
 
 private:
     cs40::Scene m_scene;
@@ -38,6 +39,8 @@ private:
     int maxDepth;
     PhotonMapper p_map;
     bool print;
+    
+    void threadedTrace( RGBImage & img, int threadID );
 
     /* Hash table mapping material names to material structs.
      * materials["current_"] is a special entry refering to the
@@ -61,6 +64,8 @@ private:
     cs40::RGBColor convertColor( vec3& clr);
 
     vec3 traceOnce( const cs40::Ray & incidentRay, int shapeIndex, int depth );
+
+    vec3 tracePixel( float i, float j );
 
     vec3 reflect( const cs40::Ray & incidentRay,
                      const vec3 & hitPoint,

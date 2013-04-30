@@ -62,55 +62,60 @@ inline vec3 transmit( const vec3 & direction, const vec3 & normal,
 inline float brdf_ct(float alpha, float beta, const vec3 & incoming,
                                     const vec3 & outgoing,
                                     const vec3 & normal ){
-    float v1 = normal.dotProduct( normal, -outgoing ) ;
-    if ( v1 <= 0 ){
+    float cos_theta_O = normal.dotProduct( normal, -outgoing ) ;
+    if ( cos_theta_O <= 0 ){
         return 0;
     }
 
-    float v2 = normal.dotProduct( normal, -incoming ) ;
-    if (v2 <= 0){
+    float cos_theta_I = normal.dotProduct( normal, -incoming ) ;
+    if (cos_theta_I <= 0){
         return 0;
     }
 
     return 0;
 }
 
+//incoming points towards the direction of incoming light, 
+//outgoing points to the direction of the viewer.
+//This model is undergoing testing. I believe that I have to multiply the
+//value of this function by cos(theta_incoming) which is cos_theta_O.
+//this turns the brdf into an illumination model, not a brdf.
 inline float brdf(float alpha, float beta, const vec3 & incoming,
                                            const vec3 & outgoing,
                                            const vec3 & normal ){
+    float cos_theta_I, cos_theta_O;
 
-    float v1 = normal.dotProduct( normal, outgoing ) ;
-    if ( v1 <= 0 ){ return 0; }
+    cos_theta_O = normal.dotProduct( normal, outgoing ) ;
+    if ( cos_theta_O <= 0 ){ return 0; }
 
-    float v2 = normal.dotProduct( normal, incoming ) ;
-
-    if ( v2 <= 0 ){ return 0; }
+    cos_theta_I = normal.dotProduct( normal, incoming ) ;
+    if ( cos_theta_I <= 0 ){ return 0; }
 
     vec3 H = (outgoing + incoming).normalized() ;
 
     float t = normal.dotProduct( normal , H );
 
-    float Gv1 = v1 / ( alpha - alpha * v1 + v1 );
-    float Gv2 = v2 / ( alpha - alpha * v2 + v2 );
-    float Gv1_by_Gv2 = Gv1 * Gv2;
+    float G_o = cos_theta_O / ( alpha - alpha * cos_theta_O + cos_theta_O );
+    float G_i = cos_theta_I / ( alpha - alpha * cos_theta_I + cos_theta_I );
+    float G_io = G_o* G_i;
 
     float denominator = 1 + alpha*t*t - t*t;
     float Zt = alpha / (denominator * denominator );
 
-    float first = Gv1_by_Gv2 * Zt / (4 * M_PI * v1 * v2 );
-    float second = (1 - Gv1_by_Gv2 )  / M_PI ;
+    float first = G_io * Zt / (4 * M_PI * cos_theta_O * cos_theta_I );
+    float second = (1 - G_io )  / M_PI ;
     float brdfVal = first + second;
 
     /*
     if ( brdfVal > 1.0 || brdfVal < 0.0 ){
-        std::cout << "\t v1: " << v1 << "\n";
-        std::cout << "\t v2: " << v2 << "\n";
+        std::cout << "\t cos_theta_O: " << cos_theta_O << "\n";
+        std::cout << "\t cos_theta_I: " << cos_theta_I << "\n";
         std::cout << "\t alpha: " << alpha << "\n";
         std::cout << "\t first: " << first << "\n";
         std::cout << "\t second: " << second << "\n";
         std::cout << "\t Zt: " << Zt << "\n";
-        std::cout << "\t Gv1_by_Gv2 : " << Gv1_by_Gv2 << "\n";
-        std::cout << "\t 4 * M_PI * v1 * v2 : " << 4 * M_PI * v1 * v2 << "\n";
+        std::cout << "\t Gcos_theta_O_by_Gcos_theta_I : " << Gcos_theta_O_by_Gcos_theta_I << "\n";
+        std::cout << "\t 4 * M_PI * cos_theta_O * cos_theta_I : " << 4 * M_PI * cos_theta_O * cos_theta_I << "\n";
         std::cout << "brdf: " << first + second << "\n";
 
     }
@@ -140,19 +145,19 @@ inline float brdf_s(float alpha, float beta,
                        const vec3 & incoming,
                        const vec3 & outgoing,
                        const vec3 & normal, 
-                       const vec3 & surfaceTangent=vec3(-2,-2,-2) ) {
+                       const vec3 & surfaceTangent=vec3(0,0,0) ) {
 
-    if (surfaceTangent.x() <= -2 ){
+    if (surfaceTangent.length() < 0.9 ){
         return brdf( alpha, beta, incoming, outgoing, normal );
     }
 
-    float v1 = normal.dotProduct( normal, outgoing );
-    if ( v1 <= 0 ){
+    float cos_theta_O = normal.dotProduct( normal, outgoing );
+    if ( cos_theta_O <= 0 ){
         return 0;
     }
 
-    float v2 = normal.dotProduct( normal, incoming ) ;
-    if (v2 <= 0){
+    float cos_theta_I = normal.dotProduct( normal, incoming ) ;
+    if (cos_theta_I <= 0){
         
         return 0;
     }
@@ -164,9 +169,9 @@ inline float brdf_s(float alpha, float beta,
     float t = normal.dotProduct( normal , H );
     float w = surfaceTangent.dotProduct( surfaceTangent, H_bar );
 
-    float Gv1 = v1 / ( alpha - alpha * v1 + v1 );
-    float Gv2 = v2 / ( alpha - alpha * v2 + v2 );
-    float Gv1_by_Gv2 = Gv1 * Gv2;
+    float Gcos_theta_O = cos_theta_O / ( alpha - alpha * cos_theta_O + cos_theta_O );
+    float Gcos_theta_I = cos_theta_I / ( alpha - alpha * cos_theta_I + cos_theta_I );
+    float Gcos_theta_O_by_Gcos_theta_I = Gcos_theta_O * Gcos_theta_I;
 
     t = t*t;
     float denominator = 1 + alpha*t - t;
@@ -177,11 +182,11 @@ inline float brdf_s(float alpha, float beta,
 
     //TODO take this out
 
-    float brdfVal = Gv1_by_Gv2 * Aw * Zt;
-    brdfVal += (1 - Gv1_by_Gv2 );        //this line enables micro facet
+    float brdfVal = Gcos_theta_O_by_Gcos_theta_I * Aw * Zt;
+    brdfVal += (1 - Gcos_theta_O_by_Gcos_theta_I );        //this line enables micro facet
                                          //specular reflections, I may want to
                                          //TODO take this out
-    brdfVal /= 4 * M_PI * v1 * v2;
+    brdfVal /= 4 * M_PI * cos_theta_O * cos_theta_I;
 /*
     if (brdfVal > 1.0 ){ 
         std::cout << "BRDF: " << brdfVal << "\n";
@@ -189,8 +194,8 @@ inline float brdf_s(float alpha, float beta,
         std::cout << "\t beta: " << beta << "\n";
         std::cout << "\t Aw: " << Aw << "\n";
         std::cout << "\t Zt: " << Zt << "\n";
-        std::cout << "\t Gv1_by_Gv2 : " << Gv1_by_Gv2 << "\n";
-        std::cout << "\t 4 * M_PI * v1 * v2 : " << 4 * M_PI * v1 * v2 << "\n";
+        std::cout << "\t Gcos_theta_O_by_Gcos_theta_I : " << Gcos_theta_O_by_Gcos_theta_I << "\n";
+        std::cout << "\t 4 * M_PI * cos_theta_O * cos_theta_I : " << 4 * M_PI * cos_theta_O * cos_theta_I << "\n";
     }
 */
     //if ( brdfVal <= 0 ){ return 0; }
@@ -235,12 +240,12 @@ inline float brdf_ABCD(float A, float B, float D, const vec3 & incoming,
                                                   const vec3 & outgoing,
                                                   const vec3 & normal ){
 
-    float v1 = normal.dotProduct( normal, outgoing ) ;
-    if ( v1 <= 0 ){ return 0; }
+    float cos_theta_O = normal.dotProduct( normal, outgoing ) ;
+    if ( cos_theta_O <= 0 ){ return 0; }
 
-    float v2 = normal.dotProduct( normal, incoming ) ;
+    float cos_theta_I = normal.dotProduct( normal, incoming ) ;
 
-    if ( v2 <= 0 ){ return 0; }
+    if ( cos_theta_I <= 0 ){ return 0; }
 
     //H is the halfway vector between incoming and outgoing
     vec3 H = (outgoing + incoming) ;
@@ -271,8 +276,8 @@ inline float brdf_ABCD(float A, float B, float D, const vec3 & incoming,
     cos_phi_out = Ti.dotProduct( Ti, To );
     sin_phi_out = sqrt( 1 - cos_phi_out*cos_phi_out );
 
-    float sin_out = sqrt( 1 - v1*v1 );
-    float sin_in  = sqrt( 1 - v2*v2 );
+    float sin_out = sqrt( 1 - cos_theta_O*cos_theta_O );
+    float sin_in  = sqrt( 1 - cos_theta_I*cos_theta_I );
 
     float fx, fy, f, 1_over_gamma;
     fx = ( sin_out * cos_phi_out - sin_out );

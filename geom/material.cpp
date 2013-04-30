@@ -32,8 +32,20 @@ vec3 Material::getLight(const vec3 & incident,
                         const vec3 & outgoing,
                         const vec3 & normal    ) const {
 
-    return phongLight( incident, outgoing, normal );
-    //return brdfLight( incident, outgoing, normal );
+    //return phongLight( incident, outgoing, normal );
+    //
+    //for indirect photons, the correct thing is to negate outgoing
+    return brdfLight( incident, -outgoing, normal );
 }
+
+//returns the "getLight" function weighted by the cosine of the incident light.
+vec3 Material::getCosLight(const vec3 & incident,
+                           const vec3 & outgoing,
+                           const vec3 & normal    ) const {
+
+    float cosine = normal.dotProduct( normal, incident );
+    return cosine * brdfLight( incident, -outgoing, normal );
+}
+
 
 

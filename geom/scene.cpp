@@ -185,26 +185,8 @@ vec3 Scene::getDirect(  const vec3 & view,
     
     if( currentLight.type == RECTANGLE ){
 
-
-        //these following lines attenuate the intensity of the light based on
-        //the difference in angle between the normal of the light and the
-        //direction from the light to the hitPoint.
-        vec3 lightCenter =  currentLight.position +
-                            currentLight.basis1 * 0.5 +
-                            currentLight.basis2 * 0.5;
-
-        vec3 direction_from_center = hitPoint - lightCenter;
-        direction_from_center.normalize();
-        float attenuation =  normal.dotProduct(  direction_from_center,
-                                                 currentLight.normal);
-
-        if (attenuation <= 0 ){
-            return vec3();
-        }
-
-
         vec3 lightPos;
-        float increment = 0.1;
+        const float increment = 0.1;
 
         for ( float j = 0.1; j <= 1.0; j += increment ){
             for( float k = 0.1; k <= 1.0; k += increment ){
@@ -222,14 +204,14 @@ vec3 Scene::getDirect(  const vec3 & view,
                 if ( !checkForIntersections ||
                      !( isObstructed( lightRay, shapeIndex )) ){
                     direction_to_light.normalize();
-                    lightVal += mat.getLight( direction_to_light,
+                    lightVal += mat.getCosLight( direction_to_light,
                                               view,
                                               normal);
                 }
             }
         }
-
-        lightVal *= fmax( attenuation, 0.0 ) * increment * increment;
+        //divide by the amount of rays that were shot.
+        lightVal *= increment * increment;
     }
 
 
@@ -243,7 +225,7 @@ vec3 Scene::getDirect(  const vec3 & view,
              !( isObstructed( lightRay, shapeIndex )) ){
 
             direction_to_light.normalize(); 
-            lightVal += mat.getLight( direction_to_light,
+            lightVal += mat.getCosLight( direction_to_light,
                                       view,
                                       normal);
         }

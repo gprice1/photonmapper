@@ -1,5 +1,5 @@
 #include "common.h"
-
+#include "iostream"
 using std::ostream;
 
 ostream& operator<<(ostream& str, const QVector3D& vec){
@@ -8,4 +8,5 @@ ostream& operator<<(ostream& str, const QVector3D& vec){
         << (float) vec.z();
     return str;
 }
+ 
 
