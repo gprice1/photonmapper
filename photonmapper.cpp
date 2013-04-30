@@ -67,7 +67,7 @@ PhotonMapper::PhotonMapper( ){
     photon_power = 10000;
 
     print = true;
-    visualize = false;
+    visualize = true;
 
     //if this value is set to true, then the photon map will not store photons
     //if they have not been reflected in some way first.
@@ -134,24 +134,9 @@ void PhotonMapper::mapScene( const Scene &scene ){
         while ( current_indirect < total_indirect ||
                 current_caustic < total_caustic   ||
                 current_shadow  < total_shadow    ){
-        
+            
             if ( print ){
-                int percentIndirect, percentCaustic;
-                int indirectDivisor, causticDivisor;
-
-                indirectDivisor = total_indirect / 100 + 1;
-                causticDivisor  = total_caustic / 100 + 1;
-
-                //get the percent done
-                if ( current_indirect % indirectDivisor == 0 ||
-                     current_caustic  % causticDivisor  == 0 ){
-
-                    percentIndirect = current_indirect / indirectDivisor;
-                    percentCaustic  = current_caustic  / causticDivisor;
-                    std::cout << "indirect: " << percentIndirect << "\t\t";
-                    std::cout << "caustic: " <<  percentCaustic  << endl;
-                
-                }
+                printInfo();
             }
 
             Ray incidentRay = scene.emitPhoton();
@@ -163,12 +148,7 @@ void PhotonMapper::mapScene( const Scene &scene ){
                 emitted_caustic ++;
             }
 
-            tracePhoton( scene, 
-                         incidentRay, 
-                         vec3(1, 1, 1 ),
-                         true,
-                         0,
-                         INT_MAX);
+            tracePhoton( scene, incidentRay );
         }
     }
 
@@ -199,12 +179,7 @@ void PhotonMapper::threaded_mapScene( const Scene &scene, int threadID ){
             caustic_emitted_array[threadID] ++;
         }
 
-        tracePhoton( scene, 
-                     incidentRay, 
-                     vec3(1, 1, 1 ),
-                     true,
-                     0,
-                     INT_MAX);
+        tracePhoton( scene, incidentRay);
     }
 }
 
@@ -236,16 +211,16 @@ void PhotonMapper::endThread(){
 //  one
 //  there also may be sign errors on the incident ray direction.
 void PhotonMapper::tracePhoton(const Scene &scene ,
-                               Ray & incidentRay,
-                               const vec3 & incidentColor){
+                               Ray & incidentRay   ){
+
+    vec3 incidentColor( 1, 1, 1 );
     bool isCaustic = true;
     int shapeIndex = -1;
 
+    //the max depth of photon bouncing is 20.
     for ( int i = 0; i < 20 ; i ++ ){
 
         if ( current_indirect >= total_indirect && !isCaustic ){ return ; }
-
-        cout << "Depth: " << depth << endl;
 
         vec3 hitPoint;
 
@@ -267,11 +242,13 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
                                                   shapeIndex,
                                                   hitPoint );
         }
-
+        
+        //if the photon does not collide with anything, then break from the loop
         if (shapeIndex == INT_MAX || shapeIndex < 0 ){
-            return;
+            break;
         }
 
+        //extract information from the hit object such as the material and normal
         Shape * shape = scene.objects[ shapeIndex ];
         Material mat = shape->material;
         vec3 normal = shape->normal( hitPoint );
@@ -288,7 +265,7 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         //surface will always absorb photons
         if ( absorbtionValue < randf() ){
             //photon was absorbed and not reflected
-            return;
+            break;
         }
         
         //photons only stick on diffuse surfaces, so the higher the alpha, the
@@ -297,8 +274,8 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         //how it is meant to be used?????
         //if exclude_direct is true, then the depth does not matter,the or section
         //will always evaluate to true.
-        if ( mat.alpha > randf() && ( !exclude_direct || depth != 0) ){
-            if( isCaustic && depth != 0 ){
+        if ( mat.alpha > randf() && ( !exclude_direct || i != 0) ){
+            if( isCaustic && i != 0 ){
                 addCaustic( incidentRay.direction, hitPoint, incidentColor );
                 isCaustic = false;
             }
@@ -321,8 +298,6 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
             
             incidentRay.direction = cs40::cosWeightedRandomHemisphereDirection(
                                                                          normal );
-            
-            incidentColor *= mat.color ); 
         }
 
         //reflect specularly
@@ -360,7 +335,11 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
                                         normal);
             }
         }
-        incidentColor *= mat.color
+        //if no reflections occur, then return.
+        else{
+            break;
+        }
+        incidentColor *= mat.color;
     }
 }
 
@@ -492,7 +471,7 @@ void PhotonMapper::addIndirect( const vec3 & direction, const vec3 & hitPoint,
 }
 
 void PhotonMapper::addCaustic( const vec3 & direction, const vec3 & hitPoint,
-                     const vec3 & incidentColor ){
+                               const vec3 & incidentColor ){
 
 
     //prevents the addition of too many photons
@@ -578,14 +557,6 @@ int PhotonMapper::isInShadow( const vec3 & point ){
 }
 
 
-inline KDTree::kd_point PhotonMapper::vec3_to_kdPoint( const vec3 & vector ){
-    KDTree::kd_point p;
-    p[0] = vector.x();
-    p[1] = vector.y();
-    p[2] = vector.z();
-    return p;
-}
-
 inline vec3 PhotonMapper::phong( const Photon * photon,
                                  const vec3 & normal,
                                  const vec3 & incident,
@@ -615,6 +586,27 @@ inline vec3 PhotonMapper::brdfLight(const Photon * photon,                      
     return photon->color * brdfVal;
 
 }
+
+
+void PhotonMapper::printInfo(){
+    int percentIndirect, percentCaustic;
+    int indirectDivisor, causticDivisor;
+
+    indirectDivisor = total_indirect / 100 + 1;
+    causticDivisor  = total_caustic / 100 + 1;
+
+    //get the percent done
+    if ( current_indirect % indirectDivisor == 0 ||
+         current_caustic  % causticDivisor  == 0 ){
+
+        percentIndirect = current_indirect / indirectDivisor;
+        percentCaustic  = current_caustic  / causticDivisor;
+        std::cout << "indirect: " << percentIndirect << "\t\t";
+        std::cout << "caustic: " <<  percentCaustic  << endl;
+    
+    }
+}
+
 
 //this performs a simple test to see if the kd tree is working like I think it
 //should.
@@ -650,4 +642,111 @@ void PhotonMapper::kdTest( ){
 
 
 
+
+
+Map::Map( int total_photons ){
+    if (total_photons > 0 ){
+        positions = new KDTree::kd_point[ total_indirect ];
+        isFull = false;
+    }else{
+        positions = NULL;
+        isFull = true;
+    }
+    total = total_photons;
+}
+
+Map::~Map(){
+
+    if (total_photons > 0 ){
+        delete [] positions;
+    }
+}
+Map::_buildTree(){
+    tree.build( positions, current );
+    _isFull = true;
+}
+
+//________________Implementation of illumination maps_______________________
+IlluminationMap::IlluminationMap : Map(total_photons ){
+    if ( total_photons > 0 ){
+        photons.reserve( total_indirect );
+    }
+}
+IlluminationMap::~IlluminationMap(){
+    if ( total_photons > 0 ){
+        photons.clear();
+    }
+}
+void IlluminationMap::addPhoton( const vec3 & direction,
+                                 const vec3 & hitPoint,
+                                 const vec3 & incidentColor ){
+
+    //prevents the addition of too many photons
+    if ( _isFull ){ return; } 
+
+  lock.lock();
+    
+    Photon * photon = new Photon( direction, incidentColor );
+    photons.push_back( photon );
+    positions[ current ] = vec3_to_kdPoint( hitPoint );
+
+    current ++;
+
+    if ( current == total ){ 
+        _buildTree();
+    }
+
+  lock.unlock();       
+}
+
+
+
+ShadowMap::ShadowMap( int total_photons) : Map(total_photons ){
+     isShadow = new bool[ total_photons ];
+}
+ShadowMap::~ShadowMap(){
+    if (total_photons > 0 ){
+        delete [] isShadow;
+    }
+}
+
+void ShadowMap::addShadow( const vector< vec3 > & pos ){
+
+    if ( _isFull ){ return ; }
+
+  lock.lock();
+    
+    for ( int i = 0; i < positions.size(); i ++ ){
+        positions[ current ] = vec3_to_kdPoint( pos[i] );
+        
+        //if the photon is the last one in the list, then it is a light photon,
+        //not a shadow photon
+        if (i == pos.size() - 1 ){
+            isShadow[ current ] = false;
+        }
+        else{
+            isShadow[ current ] = true;
+        }
+
+        current ++;
+        if ( current == total ){ 
+            _buildTree();
+            lock.unlock();
+            return ;
+        } 
+    }
+
+  lock.unlock();
+
+}
+
+
+//a samll utility function to help me out.
+inline KDTree::kd_point vec3_to_kdPoint( const vec3 & vector ){
+    KDTree::kd_point p;
+    p[0] = vector.x();
+    p[1] = vector.y();
+    p[2] = vector.z();
+    return p;
+}
 

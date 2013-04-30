@@ -19,6 +19,13 @@ typedef kd_tree< float , 3 > KDTree;
 /* A basic Ray class.*/
 namespace cs40{
 
+inline KDTree::kd_point vec3_to_kdPoint( const vec3 & vector );
+    
+
+class Map;
+class IlluminationMap;
+class ShadowMap;
+
 class PhotonMapper{
 
 public:
@@ -30,7 +37,6 @@ public:
     ~PhotonMapper();
 
     void mapScene( const Scene &scene );
-
 
     vec3 getIllumination( const vec3 & point,
                           const vec3 & incident,
@@ -68,6 +74,13 @@ public:
 private:
 
 //_________________________Private Variables__________________________________
+    
+    ShadowMap shadow;
+    IlluminationMap caustic;
+    IlluminationMap indirect;
+
+
+
     KDTree indirect_tree;
     KDTree caustic_tree;
     KDTree shadow_tree;
@@ -93,9 +106,7 @@ private:
 //___________________________Private Functions________________________________
     void build();
 
-    void tracePhoton(const cs40::Scene & scene , cs40::Ray & incidentRay,
-                     const vec3 & incidentColor, bool isCaustic , int depth,
-                     int shapeIndex);
+    void tracePhoton(const cs40::Scene & scene , cs40::Ray & incidentRay );
 
     void addIndirect( const vec3 & direction, const vec3 & hitPoint,
                     const vec3 & incidentColor );
@@ -142,7 +153,51 @@ private:
                                          const vec3 & normal,
                                          const vec3 & incident,
                                          const cs40::Material & mat);
+    void printInfo();
 
+};
+
+
+class Map{
+
+    public:
+
+        Map( int total_photons );      
+        ~Map();
+        bool isFull(){ return _isFull ; }
+
+        unsigned int N, total, emitted;
+        float epsilon;
+        std::mutex lock;
+        KDTree tree;
+        KDTree::kd_point * positions;
+
+   private:
+        unsigned int current;
+        bool _isFull;
+        void _buildTree();
+        
+};
+
+class IlluminationMap : public Map {
+    public:
+        IlluminationMap( int total_photons ) : Map(total_photons);
+        ~IlluminationMap();
+        void addPhoton( const vec3 & direction,
+                        const vec3 & hitPoint,
+                        const vec3 & incidentColor );
+
+        vector<Photon *> photons;
+};
+
+
+class ShadowMap : public Map{
+    public:
+        ShadowMap( int total_photons) : Map(total_photons );
+        ~ShadowMap();
+        void addShadow( const vector< vec3 > & pos );
+
+        bool * isShadow;
 };
 
 } //namespace
