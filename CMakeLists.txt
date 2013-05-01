@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 2.8.0)
-set(CMAKE_CXX_FLAGS "-g -Wall -O3")
+set(CMAKE_CXX_FLAGS "-std=c++0x -stdlib=libc++ -g -Wall")
 set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules) #for FindGLEW.cmake
 
 FIND_PACKAGE(OpenGL REQUIRED) #for graphics
@@ -31,9 +31,9 @@ set( DIREC png kdtree geom parse )
 include_directories( ${DIREC} )
 link_directories( ${DIREC} )
 
-set(HDRS  raytracer.h photonmapper.h functions.h )
+set(HDRS  raytracer.h photonmapper.h functions.h map.h )
 
-set(LIBSRCS raytracer.cpp photonmapper.cpp)
+set(LIBSRCS raytracer.cpp photonmapper.cpp map.cpp)
    
 add_library(rtrace ${HDRS} ${LIBSRCS})
 
