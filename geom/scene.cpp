@@ -21,12 +21,13 @@ using cs40::Material;
  */
 
 int Scene::checkIntersection( const Ray & incidentRay, 
-                              int shapeIndex, 
+                              const int shapeIndex, 
                               vec3 & hitPoint ) const{
     float currentTime , minTime;
+
     //if the ray is inside the object, then it means that
     //I only want to intersect with the current object.
-    if ( incidentRay.isInsideObject ){
+    if ( incidentRay.isInsideObject && shapeIndex >= 0  ){
         currentTime = objects[shapeIndex]->hitTime( incidentRay );
         hitPoint = incidentRay( currentTime );
         return shapeIndex;

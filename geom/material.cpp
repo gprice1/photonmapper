@@ -44,7 +44,7 @@ vec3 Material::getCosLight(const vec3 & incident,
                            const vec3 & normal    ) const {
 
     float cosine = normal.dotProduct( normal, incident );
-    return cosine * brdfLight( incident, -outgoing, normal );
+    return cosine * getLight( incident, outgoing, normal );
 }
 
 

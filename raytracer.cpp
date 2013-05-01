@@ -484,7 +484,38 @@ void RayTracer::parseLine(const vector<string>& words){
         checksize( words, 1);
         m_materials["current_"].beta = parseFloat(words[1]);
     }
+    else if ( cmd == "photon" ){
+        checksize( words, 3 );
+        cs40::PhotonMapper p_map (  parseInt( words[1] ),
+                                    parseInt( words[2] ),
+                                    parseInt( words[3] )  );
+    }
+    else if ( cmd == "photon_power" ){
+        checksize( words, 1 );
+        p_map.photon_power = parseFloat( words[1] );
+    }
+    else if( cmd == "photon_N" ){
+        checksize( words, 3 );
+        p_map.shadow.N    = parseInt( words[1] );
+        p_map.caustic.N   = parseInt( words[2] );
+        p_map.indirect.N  = parseInt( words[3] );
+    }
+    else if( cmd == "photon_visualize" ){
+        p_map.visualize = true;
+    }
+    else if( cmd == "photon_exclude_direct" ){
+        p_map.exclude_direct = true;
+    }
+    else if( cmd == "photon_include_direct" ){
+        p_map.exclude_direct = false;
+    }
 
+    else if( cmd == "photon_epsilon" ){
+        checksize( words, 3 );
+        p_map.shadow.epsilon    = parseFloat( words[1] );
+        p_map.caustic.epsilon   = parseFloat( words[2] );
+        p_map.indirect.epsilon  = parseFloat( words[3] );
+    }
     else{
         throw parser_error("Unknown command: "+cmd);
     }

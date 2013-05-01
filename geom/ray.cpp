@@ -13,7 +13,7 @@ Ray::Ray(const Ray& other):
     isInsideObject( other.isInsideObject) { };
 
 Ray::Ray(const vec3& src, const vec3& dir):
-    origin(src), direction(dir){ };
+    origin(src), direction(dir), isInsideObject( false ){ };
 
 /* convert Ray to string representation */
 string Ray::str() const {
