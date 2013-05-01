@@ -1,0 +1,127 @@
+#comment
+output test.png
+outsize 200 200
+origin -5 -5 8
+eye 0 0 15
+horiz 10 0 0
+vert 0 10 0
+
+#set the values for the photon mapper
+photon 0 100000 0
+photon_N 0 100 0
+photon_power 100
+photon_exclude_direct
+
+#assign names to colors
+color green 0.07 1 0.2
+color white 1 1 1
+color blue 0.4 0.4 1.0
+color red  1.0 0.2 0.2
+color beige 0.95 0.95 0.8
+color yellow 1.0 0.95 0.95
+color clear 0 0 0
+color mirror 1 1 1
+color marble 1.0 1.0 1.0
+color metal 0.5 0.5 0.5
+background 0 0 0 
+
+mat color metal
+alpha 0.2
+beta 0.8
+refract 0
+mat save metal
+
+mat color marble
+alpha 0.1
+beta 0.01
+refract 0
+mat save marble
+
+mat color beige
+alpha 0.95
+beta 0.95
+refract 0
+mat save beige
+
+mat color yellow
+alpha 0.8
+beta 0.01
+refract 0
+mat save yellow
+
+mat color white
+alpha 1.0
+beta 0.0
+refract 0
+mat save white
+
+mat color green
+alpha 0.2
+beta 0.01
+refract 0 
+mat save green
+
+mat color clear
+alpha 0.001
+beta 0.0
+refract 1.5
+mat save clear
+
+#define color by name
+mat color mirror
+alpha 0.0
+beta 1.0
+refract 0
+mat save mirror
+
+mat color blue
+alpha 0.01
+beta 0.5
+refract 0.0
+mat save blue
+
+mat color red
+alpha 0.2
+beta 0.5
+refract 0.0
+mat save red
+
+mat load green
+sphere 4 -2 3 3
+
+mat load yellow
+sphere -4.5 -1 -1 4
+
+mat load red
+#floor
+mat load marble
+rectangle -10 -5 15.1   10 -5 15.1  10 -5 -7
+
+#left wall
+mat load red
+rectangle -10 -5 15.1  -10 8 -7    -10 8 15.1  
+
+#back wall
+
+mat load beige
+rectangle 10 8 15.1     10 -5 15.1   -10 -5 15.1    
+
+#right wall
+rectangle 10 -5 15.1    10 8 15.1    10 8 -7 
+
+#front wall
+rectangle -10 -5 -7   10 -5 -7     10 8 -7  
+
+#ceiling
+rectangle -10 8 15.1    -10 8 -7    10 8 -7  
+
+#global ambient
+amblight 0.2
+
+mat load white
+rectangle -2 7.999 2    -2 7.999 -2    2 7.999 -2  
+
+#type , intensity, ll ul ur 
+light rectangle 0.5   -2 7.990 2    -2 7.990 -2    2 7.990 -2
+
+#light rectangle 1.0   -5 1     15    3 -1    15   -3 -1    15 
