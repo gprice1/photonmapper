@@ -27,14 +27,14 @@ class Map{
         bool isFull(){ return _isFull ; }
         
 
-        unsigned int N, total, emitted;
+        int N, total, emitted;
         float epsilon;
         std::mutex lock;
         KDTree tree;
         KDTree::kd_point * positions;
 
     protected:
-        unsigned int current;        
+        int current;        
         void _buildTree();
         
     private:
