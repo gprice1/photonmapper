@@ -82,7 +82,7 @@ private:
                  int shapeIndex,
                  int depth );
     
-    void loadModel( char * objectFile );
+    //void loadModel( char * objectFile );
     
     void getPhotonMap();
 

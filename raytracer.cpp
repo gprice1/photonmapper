@@ -25,7 +25,7 @@
 #include "sphere.h"
 #include "rectangle.h"
 #include "triangle.h"
-#include "glm.h"
+//#include "glm.h"
 #include <time.h>
 #include "functions.h"
 
@@ -623,7 +623,7 @@ void RayTracer::getPhotonMap(){
 }
 
 
-
+/*
 void RayTracer::loadModel( char * objectFile )
 {
     GLMmodel *objmodel_ptr;
@@ -642,7 +642,7 @@ void RayTracer::loadModel( char * objectFile )
     glmVertexNormals(objmodel_ptr, 90.0);
 }
 
-
+*/
 /*After this code is executed, the model will have been loaded, 
  * normals will have been created and smoothed, and the model will be
  *  ready to render. To draw the loaded model, add the following code
