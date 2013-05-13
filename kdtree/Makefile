@@ -115,6 +115,19 @@ makescene/fast:
 .PHONY : makescene/fast
 
 #=============================================================================
+# Target rules for targets named profiler
+
+# Build rule for target.
+profiler: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 profiler
+.PHONY : profiler
+
+# fast build rule for target.
+profiler/fast:
+	$(MAKE) -f CMakeFiles/profiler.dir/build.make CMakeFiles/profiler.dir/build
+.PHONY : profiler/fast
+
+#=============================================================================
 # Target rules for targets named raytracer
 
 # Build rule for target.
@@ -227,6 +240,30 @@ photonmapper.cpp.s:
 	$(MAKE) -f CMakeFiles/rtrace.dir/build.make CMakeFiles/rtrace.dir/photonmapper.cpp.s
 .PHONY : photonmapper.cpp.s
 
+profiler.o: profiler.cpp.o
+.PHONY : profiler.o
+
+# target to build an object file
+profiler.cpp.o:
+	$(MAKE) -f CMakeFiles/profiler.dir/build.make CMakeFiles/profiler.dir/profiler.cpp.o
+.PHONY : profiler.cpp.o
+
+profiler.i: profiler.cpp.i
+.PHONY : profiler.i
+
+# target to preprocess a source file
+profiler.cpp.i:
+	$(MAKE) -f CMakeFiles/profiler.dir/build.make CMakeFiles/profiler.dir/profiler.cpp.i
+.PHONY : profiler.cpp.i
+
+profiler.s: profiler.cpp.s
+.PHONY : profiler.s
+
+# target to generate assembly for a file
+profiler.cpp.s:
+	$(MAKE) -f CMakeFiles/profiler.dir/build.make CMakeFiles/profiler.dir/profiler.cpp.s
+.PHONY : profiler.cpp.s
+
 raytracer.o: raytracer.cpp.o
 .PHONY : raytracer.o
 
@@ -259,6 +296,7 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... makescene"
+	@echo "... profiler"
 	@echo "... raytracer"
 	@echo "... rebuild_cache"
 	@echo "... rtrace"
@@ -271,6 +309,9 @@ help:
 	@echo "... photonmapper.o"
 	@echo "... photonmapper.i"
 	@echo "... photonmapper.s"
+	@echo "... profiler.o"
+	@echo "... profiler.i"
+	@echo "... profiler.s"
 	@echo "... raytracer.o"
 	@echo "... raytracer.i"
 	@echo "... raytracer.s"

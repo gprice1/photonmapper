@@ -1,5 +1,4 @@
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} .
-     ../geom ../kdtree ../png ../parse ../scene )
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} . )
 
 set(HDRS feature_vector.h indirect_heap.h k-heap.h k-vector.h kd-tree.h  )
    
