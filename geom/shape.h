@@ -10,7 +10,7 @@ namespace cs40{
 class Shape { 
 public:
     cs40::Material material; //color information
-
+    Shape(){ isLight = false; }
     virtual ~Shape() { /*do nothing*/ };
     
     /* return a time t for which the ray r = p + v*t would
@@ -23,6 +23,8 @@ public:
     virtual vec3 normal(const vec3& p) const = 0;
 
     std::string name;
+
+    bool isLight;
 };
 
 } //namespace

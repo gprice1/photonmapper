@@ -39,8 +39,8 @@ Map::~Map(){
 }
 
 void Map::_buildTree(){
+    _isFull = true;    
     tree.build( positions, current );
-    _isFull = true;
 }
 
 
@@ -61,10 +61,13 @@ void IlluminationMap::addPhoton( const vec3 & direction,
                                  const vec3 & hitPoint,
                                  const vec3 & incidentColor ){
 
-    //prevents the addition of too many photons
+    //prevents the addition of too many photons and allows for an early
+    //bail out
     if ( isFull() ){ return; } 
 
   lock.lock();
+
+    if ( isFull() ){ return; }
     
     Photon * photon = new Photon( direction, incidentColor );
     photons.push_back( photon );
@@ -78,6 +81,7 @@ void IlluminationMap::addPhoton( const vec3 & direction,
 
   lock.unlock();       
 }
+
 vec3 IlluminationMap::getColor( const vec3 & point, const vec3 & view,
                                 const vec3 & normal, const Material & mat) const{
 
@@ -100,10 +104,9 @@ vec3 IlluminationMap::getColor( const vec3 & point, const vec3 & view,
         
         currentIndex = neighbours[i].index;
 
-        color = mat.getCosLight( -photons[ currentIndex ]->direction, view, 
+        color = mat.getLight( -photons[ currentIndex ]->direction, view,
                                   normal );
-
-        filterVal = gaussianFilter( neighbours[i].squared_distance, 
+        filterVal = gaussianFilter( neighbours[i].squared_distance,
                                           maxDistSqrd );
         total_color += filterVal * color * photons[ currentIndex ]->color ;
     } 
@@ -129,9 +132,11 @@ ShadowMap::~ShadowMap(){
 
 void ShadowMap::addShadow( const vector< vec3 > & pos ){
 
+    //this allows for a early bailout
     if ( isFull() ){ return ; }
 
   lock.lock();
+    if ( isFull() ){ return ; }
     
     for ( int i = 0; i < pos.size(); i ++ ){
         positions[ current ] = vec3_to_kdPoint( pos[i] );

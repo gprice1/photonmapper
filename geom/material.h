@@ -37,12 +37,24 @@ public:
                            const vec3 & outgoing,
                            const vec3 & normal    ) const ;
 
+    vec3 sample(const vec3 & outgoing,
+                const vec3 & normal    ) const ;
+
+    float getBRDF(const vec3 & incident,
+                 const vec3 & outgoing,
+                 const vec3 & normal    ) const ;
+
+
+
 private:
 
     inline vec3 brdfLight( const vec3 & incident,
                            const vec3 & outgoing,
                            const vec3 & normal    ) const ;
     inline vec3 phongLight(const vec3 & incident,
+                           const vec3 & outgoing,
+                           const vec3 & normal    ) const ;
+    inline vec3 wardLight(const vec3 & incident,
                            const vec3 & outgoing,
                            const vec3 & normal    ) const ;
 

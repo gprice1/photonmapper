@@ -10,9 +10,9 @@ int main(int argc, char* argv[]){
     
     if(argc < 2 ){ //Check it users are using program correctly
         std::cout << "Usage: " << argv[0] << " <inputfile>  <number_threads>\n";
-        rt.parseFile("input.txt");
+        rt.parseFile("room.txt");
     }
-    else if( argc == 3 && atoi( argv[2] ) != 0 ){
+    else if( argc >= 3 && atoi( argv[2] ) != 0 ){
         rt.parseFile(argv[1]);        
         rt.num_threads = atoi( argv[2] );
     }
@@ -23,6 +23,10 @@ int main(int argc, char* argv[]){
 
     //rt.trace(); //TODO: ray trace away!
     rt.save();
+
+    if ( argc > 3 ){
+        rt.getCommandLineArgs();
+    }
 
     return 0;
 }

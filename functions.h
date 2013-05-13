@@ -58,244 +58,6 @@ inline vec3 transmit( const vec3 & direction, const vec3 & normal,
     return transmission;
 }
 
-//this is the cook - torrance brdf model
-inline float brdf_ct(float alpha, float beta, const vec3 & incoming,
-                                    const vec3 & outgoing,
-                                    const vec3 & normal ){
-    float cos_theta_O = normal.dotProduct( normal, -outgoing ) ;
-    if ( cos_theta_O <= 0 ){
-        return 0;
-    }
-
-    float cos_theta_I = normal.dotProduct( normal, -incoming ) ;
-    if (cos_theta_I <= 0){
-        return 0;
-    }
-
-    return 0;
-}
-
-//incoming points towards the direction of incoming light, 
-//outgoing points to the direction of the viewer.
-//This model is undergoing testing. I believe that I have to multiply the
-//value of this function by cos(theta_incoming) which is cos_theta_O.
-//this turns the brdf into an illumination model, not a brdf.
-inline float brdf(float alpha, float beta, const vec3 & incoming,
-                                           const vec3 & outgoing,
-                                           const vec3 & normal ){
-    float cos_theta_I, cos_theta_O;
-
-    cos_theta_O = normal.dotProduct( normal, outgoing ) ;
-    if ( cos_theta_O <= 0 ){ return 0; }
-
-    cos_theta_I = normal.dotProduct( normal, incoming ) ;
-    if ( cos_theta_I <= 0 ){ return 0; }
-
-    vec3 H = (outgoing + incoming).normalized() ;
-
-    float t = normal.dotProduct( normal , H );
-
-    float G_o = cos_theta_O / ( alpha - alpha * cos_theta_O + cos_theta_O );
-    float G_i = cos_theta_I / ( alpha - alpha * cos_theta_I + cos_theta_I );
-    float G_io = G_o* G_i;
-
-    float denominator = 1 + alpha*t*t - t*t;
-    float Zt = alpha / (denominator * denominator );
-
-    float first = G_io * Zt / (4 * M_PI * cos_theta_O * cos_theta_I );
-    float second = (1 - G_io )  / M_PI ;
-    float brdfVal = first + second;
-
-    /*
-    if ( brdfVal > 1.0 || brdfVal < 0.0 ){
-        std::cout << "\t cos_theta_O: " << cos_theta_O << "\n";
-        std::cout << "\t cos_theta_I: " << cos_theta_I << "\n";
-        std::cout << "\t alpha: " << alpha << "\n";
-        std::cout << "\t first: " << first << "\n";
-        std::cout << "\t second: " << second << "\n";
-        std::cout << "\t Zt: " << Zt << "\n";
-        std::cout << "\t Gcos_theta_O_by_Gcos_theta_I : " << Gcos_theta_O_by_Gcos_theta_I << "\n";
-        std::cout << "\t 4 * M_PI * cos_theta_O * cos_theta_I : " << 4 * M_PI * cos_theta_O * cos_theta_I << "\n";
-        std::cout << "brdf: " << first + second << "\n";
-
-    }
-    */
-
-    //if ( brdfVal > 1.0 ){ return 1.0; }
-    return  brdfVal; 
-}
-
-
-//incoming is the incoing direction
-//outgoing is the outgoing direction
-//
-//
-//T may not be the correct quantity.
-//this is the schlick model with both isotropy and diffuse/specular
-//this model also handles microfacets
-//TODO : The microfacet code may be defective
-//TODO : there are some very serious bounds errors and I am not sure if
-//       they are supposed to be there.
-//TODO : I am unsure of the proper value of T. 
-//All of the vectors should be pointing out of the surface of the object.
-//
-//the incoming should be the incident light.
-//the outgoing should be  view vector.
-inline float brdf_s(float alpha, float beta, 
-                       const vec3 & incoming,
-                       const vec3 & outgoing,
-                       const vec3 & normal, 
-                       const vec3 & surfaceTangent=vec3(0,0,0) ) {
-
-    if (surfaceTangent.length() < 0.9 ){
-        return brdf( alpha, beta, incoming, outgoing, normal );
-    }
-
-    float cos_theta_O = normal.dotProduct( normal, outgoing );
-    if ( cos_theta_O <= 0 ){
-        return 0;
-    }
-
-    float cos_theta_I = normal.dotProduct( normal, incoming ) ;
-    if (cos_theta_I <= 0){
-        
-        return 0;
-    }
-
-    vec3 H = (outgoing + incoming).normalized() ;
-    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
-    H_bar.normalize();
-
-    float t = normal.dotProduct( normal , H );
-    float w = surfaceTangent.dotProduct( surfaceTangent, H_bar );
-
-    float Gcos_theta_O = cos_theta_O / ( alpha - alpha * cos_theta_O + cos_theta_O );
-    float Gcos_theta_I = cos_theta_I / ( alpha - alpha * cos_theta_I + cos_theta_I );
-    float Gcos_theta_O_by_Gcos_theta_I = Gcos_theta_O * Gcos_theta_I;
-
-    t = t*t;
-    float denominator = 1 + alpha*t - t;
-    float Zt = alpha / (denominator * denominator );
-
-    w = w*w;
-    float Aw = sqrt( beta / ( beta*beta - beta*beta*w + w ) );
-
-    //TODO take this out
-
-    float brdfVal = Gcos_theta_O_by_Gcos_theta_I * Aw * Zt;
-    brdfVal += (1 - Gcos_theta_O_by_Gcos_theta_I );        //this line enables micro facet
-                                         //specular reflections, I may want to
-                                         //TODO take this out
-    brdfVal /= 4 * M_PI * cos_theta_O * cos_theta_I;
-/*
-    if (brdfVal > 1.0 ){ 
-        std::cout << "BRDF: " << brdfVal << "\n";
-        std::cout << "\t alpha: " << alpha << "\n";
-        std::cout << "\t beta: " << beta << "\n";
-        std::cout << "\t Aw: " << Aw << "\n";
-        std::cout << "\t Zt: " << Zt << "\n";
-        std::cout << "\t Gcos_theta_O_by_Gcos_theta_I : " << Gcos_theta_O_by_Gcos_theta_I << "\n";
-        std::cout << "\t 4 * M_PI * cos_theta_O * cos_theta_I : " << 4 * M_PI * cos_theta_O * cos_theta_I << "\n";
-    }
-*/
-    //if ( brdfVal <= 0 ){ return 0; }
-    if ( brdfVal >= 1.0 ) { return 1.0 ;}
-
-    return brdfVal;
-}
-
-
-
-
-
-
-//this is meant to give a montecarlo importance sample for the brdf_s
-//function above.
-//TODO make this work.
-inline vec3 sample_s( float alpha, float beta, const vec3 & in,
-                                           const vec3 & out,
-                                           const vec3 & normal ){
-
-    float zenith, azimuth;
-    float A = randf();
-    float B = randf();
-
-    //this controls which quarter-shpere the ray is emitted from.
-    //int   C = (rand() % 2);
-
-    B *= B;
-    beta *= beta;
-    float B_beta = B * beta;
-    azimuth = M_PI / 2 * sqrt( B_beta / ( 1 - beta + B_beta ) );
-
-    zenith = acos( sqrt( A / ( alpha - A * alpha + A ) ) );
-
-    return vec3();
-
-}
-/*
-//for efficient rendering,
-//all of the vectors should be pointing out of the surface.
-inline float brdf_ABCD(float A, float B, float D, const vec3 & incoming,
-                                                  const vec3 & outgoing,
-                                                  const vec3 & normal ){
-
-    float cos_theta_O = normal.dotProduct( normal, outgoing ) ;
-    if ( cos_theta_O <= 0 ){ return 0; }
-
-    float cos_theta_I = normal.dotProduct( normal, incoming ) ;
-
-    if ( cos_theta_I <= 0 ){ return 0; }
-
-    //H is the halfway vector between incoming and outgoing
-    vec3 H = (outgoing + incoming) ;
-
-    //H_hat is the normalized halfway vector
-    vec3 H_hat = H.normalized();
-
-    //H_bat is the halfway vector projected into the surface plane
-    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
-    H_bar.normalize();
-
-    //the difference between the reflection vector and the outgoing vector
-    vec3 Dp = H - normal.dotProduct( H, normal) * normal;
-
-    vec3 Ti = outgoing.crossProduct( normal ,
-             outgoing.crossProduct( incoming , normal ) );
-    Ti.normalize();
-
-    vec3 To = outgoing.crossProduct( normal ,
-             outgoing.crossProduct( outgoing , normal ) );
-    To.normalize();
-
-    float w = T.dotProduct( T, H_bar );
-    float t = normal.dotProduct( normal , H );
-   
-    //this is phi out when we put phi_in at pi that phi_in is pi
-    float sin_phi_out , cos_phi_out;
-    cos_phi_out = Ti.dotProduct( Ti, To );
-    sin_phi_out = sqrt( 1 - cos_phi_out*cos_phi_out );
-
-    float sin_out = sqrt( 1 - cos_theta_O*cos_theta_O );
-    float sin_in  = sqrt( 1 - cos_theta_I*cos_theta_I );
-
-    float fx, fy, f, 1_over_gamma;
-    fx = ( sin_out * cos_phi_out - sin_out );
-    fy = sin_out * sin_phi_out;
-    f = sqrt( fx*fx + fy*fy );
-
-    float B, C;
-    B = b * b;
-    C = (c + 1)/2;
-    float spectralDensity = A / pow( 1 + B*f*f , C  );
-    
-    
-    return  brdfVal; 
-}
-
-*/
-
-
 
 //to keep with my other convections, direction should be the direction of the
 //ray going into the surface
@@ -535,6 +297,208 @@ inline float gaussianFilter(float distSqrd, float maxDistSqrd ){
     return filterVal;
 }
 
+
+//incoming points towards the direction of incoming light, 
+//outgoing points to the direction of the viewer.
+//This model is undergoing testing. I believe that I have to multiply the
+//value of this function by cos(theta_incoming) which is cos_theta_O.
+//this turns the brdf into an illumination model, not a brdf.
+inline float brdf(float alpha, float beta, const vec3 & incoming,
+                                           const vec3 & outgoing,
+                                           const vec3 & normal ){
+    float cos_theta_I, cos_theta_O;
+
+    cos_theta_O = normal.dotProduct( normal, outgoing ) ;
+    if ( cos_theta_O <= 0 ){ return 0; }
+
+    cos_theta_I = normal.dotProduct( normal, incoming ) ;
+    if ( cos_theta_I <= 0 ){ return 0; }
+
+    vec3 H = (outgoing + incoming).normalized() ;
+
+    float t = normal.dotProduct( normal , H );
+
+    float G_o = cos_theta_O / ( alpha - alpha * cos_theta_O + cos_theta_O );
+    float G_i = cos_theta_I / ( alpha - alpha * cos_theta_I + cos_theta_I );
+    float G_io = G_o* G_i;
+
+    float denominator = 1 + alpha*t*t - t*t;
+    float Zt = alpha / (denominator * denominator );
+
+    float first = G_io * Zt / (4 * M_PI * cos_theta_O * cos_theta_I );
+    float second = (1 - G_io )  / M_PI ;
+    float brdfVal = first + second;
+
+    /*
+    if ( brdfVal > 1.0 || brdfVal < 0.0 ){
+        std::cout << "\t cos_theta_O: " << cos_theta_O << "\n";
+        std::cout << "\t cos_theta_I: " << cos_theta_I << "\n";
+        std::cout << "\t alpha: " << alpha << "\n";
+        std::cout << "\t first: " << first << "\n";
+        std::cout << "\t second: " << second << "\n";
+        std::cout << "\t Zt: " << Zt << "\n";
+        std::cout << "\t Gcos_theta_O_by_Gcos_theta_I : " << Gcos_theta_O_by_Gcos_theta_I << "\n";
+        std::cout << "\t 4 * M_PI * cos_theta_O * cos_theta_I : " << 4 * M_PI * cos_theta_O * cos_theta_I << "\n";
+        std::cout << "brdf: " << first + second << "\n";
+
+    }
+    */
+
+    //if ( brdfVal > 1.0 ){ return 1.0; }
+    return  brdfVal; 
+}
+
+
+//incoming is the incoing direction
+//outgoing is the outgoing direction
+//
+//
+//T may not be the correct quantity.
+//this is the schlick model with both isotropy and diffuse/specular
+//this model also handles microfacets
+//TODO : The microfacet code may be defective
+//TODO : there are some very serious bounds errors and I am not sure if
+//       they are supposed to be there.
+//TODO : I am unsure of the proper value of T. 
+//All of the vectors should be pointing out of the surface of the object.
+//
+//the incoming should be the incident light.
+//the outgoing should be  view vector.
+inline float brdf_s(float alpha, float beta, 
+                       const vec3 & incoming,
+                       const vec3 & outgoing,
+                       const vec3 & normal, 
+                       const vec3 & surfaceTangent=vec3(0,0,0) ) {
+
+    if (surfaceTangent.length() < 0.9 ){
+        return brdf( alpha, beta, incoming, outgoing, normal );
+    }
+
+    float cos_theta_O = normal.dotProduct( normal, outgoing );
+    if ( cos_theta_O <= 0 ){
+        return 0;
+    }
+
+    float cos_theta_I = normal.dotProduct( normal, incoming ) ;
+    if (cos_theta_I <= 0){
+        
+        return 0;
+    }
+
+    vec3 H = (outgoing + incoming).normalized() ;
+    vec3 H_bar = H.crossProduct( normal , H.crossProduct( H, normal ));
+    H_bar.normalize();
+
+    float t = normal.dotProduct( normal , H );
+    float w = surfaceTangent.dotProduct( surfaceTangent, H_bar );
+
+    float Gcos_theta_O = cos_theta_O / ( alpha - alpha * cos_theta_O + cos_theta_O );
+    float Gcos_theta_I = cos_theta_I / ( alpha - alpha * cos_theta_I + cos_theta_I );
+    float Gcos_theta_O_by_Gcos_theta_I = Gcos_theta_O * Gcos_theta_I;
+
+    t = t*t;
+    float denominator = 1 + alpha*t - t;
+    float Zt = alpha / (denominator * denominator );
+
+    w = w*w;
+    float Aw = sqrt( beta / ( beta*beta - beta*beta*w + w ) );
+
+    //TODO take this out
+
+    float brdfVal = Gcos_theta_O_by_Gcos_theta_I * Aw * Zt;
+    brdfVal += (1 - Gcos_theta_O_by_Gcos_theta_I );        //this line enables micro facet
+                                         //specular reflections, I may want to
+                                         //TODO take this out
+    brdfVal /= 4 * M_PI * cos_theta_O * cos_theta_I;
+/*
+    if (brdfVal > 1.0 ){ 
+        std::cout << "BRDF: " << brdfVal << "\n";
+        std::cout << "\t alpha: " << alpha << "\n";
+        std::cout << "\t beta: " << beta << "\n";
+        std::cout << "\t Aw: " << Aw << "\n";
+        std::cout << "\t Zt: " << Zt << "\n";
+        std::cout << "\t Gcos_theta_O_by_Gcos_theta_I : " << Gcos_theta_O_by_Gcos_theta_I << "\n";
+        std::cout << "\t 4 * M_PI * cos_theta_O * cos_theta_I : " << 4 * M_PI * cos_theta_O * cos_theta_I << "\n";
+    }
+*/
+    //if ( brdfVal <= 0 ){ return 0; }
+    if ( brdfVal >= 1.0 ) { return 1.0 ;}
+
+    return brdfVal;
+}
+
+
+//this is the ward brdf model.
+//it was outlined in the paper,
+//" Notes on the Ward BRDF" by Bruce Walter, 
+//      Technical Report PCG-05-06
+//      Cornell Program of Computer Graphics
+//      April 29, 2005
+// k_diff is the diffuse constant, k_spec is the specular constant
+// alpha controls the size of the specular highlight, while k_spec controls the
+// intensity.
+inline float brdf_ward(float alpha, float beta,
+                       const vec3 & incoming,
+                       const vec3 & outgoing,
+                       const vec3 & normal   ) {
+
+    float betaSqrd = beta * beta;
+    
+    vec3 H = (outgoing + incoming).normalized() ;
+
+    float constant1 = (1 - alpha) / ( 4 * M_PI * betaSqrd );
+    float constant2 = sqrt( incoming.dotProduct( incoming, normal ) *
+                            outgoing.dotProduct( outgoing, normal )   );
+    float constant3 = constant1 / constant2;
+
+    float H_dot_N = H.dotProduct( normal, H );
+    float H_dot_N_sqrd = H_dot_N * H_dot_N;
+    float power = - H_dot_N_sqrd / ( 1 - H_dot_N_sqrd ) / betaSqrd ;
+
+    float spec = constant3 * exp( power );
+    float diff = alpha / M_PI;
+
+    return diff + spec;
+}
+
+//this takes in an incoming view ray and computes the outgoing ray of light
+inline vec3 sample_ward( float alpha, float beta,
+                       const vec3 & incoming,
+                       const vec3 & normal, 
+                       const vec3 & surfaceTangent=vec3(1,0,0) ){
+    float theta, phi;
+    float a, b;
+    a = randf();
+    b = randf();
+
+    phi = 2 * M_PI * b;
+
+    theta = atan( beta * sqrt( -log(a) ));
+    
+    return angle_to_direction( theta, phi );
+}
+
+inline float brdf_sample_ward(float alpha, float beta,
+                              const vec3 & incoming,
+                              const vec3 & outgoing,
+                              const vec3 & normal   ) {
+    float betaSqrd = beta * beta;
+
+    vec3 H = (outgoing + incoming).normalized() ;
+
+    float H_dot_N = H.dotProduct( normal, H );
+    float H_dot_N_sqrd = H_dot_N * H_dot_N;
+
+    float constant1 = 4 * M_PI * betaSqrd;
+    float constant2 = H.dotProduct( H, incoming ) * H_dot_N_sqrd * H_dot_N;
+    float constant3 = 1 / ( constant1 * constant2 );
+
+    float power = - H_dot_N_sqrd / ( 1 - H_dot_N_sqrd ) / betaSqrd ;    
+    float spec = constant3 * exp( power );
+    float diff = alpha / M_PI;
+
+    return diff + spec;
+}
 
 }//namespace
 

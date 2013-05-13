@@ -50,6 +50,7 @@ using cs40::View;
 //using namespace cs40;
 
 #define imax(a,b) (a>b?a:b)
+#define imin(a,b) (a<b?a:b)
 
 RayTracer::RayTracer(){
     /* do nothing? */
@@ -60,13 +61,29 @@ RayTracer::RayTracer(){
     print = false;
 
     //what types of lighting do I want to happen?
-    get_indirect= true;
+    get_indirect= false;
     get_direct  = false;
     get_reflect = false;
-    get_raycast = false;
+    get_raycast = true;
     get_caustic = false;
 
+    num_raycast = 0;
     num_threads = 1;
+
+    directPower = 1.0;
+    indirectPower = 1.0;
+    reflectPower = 1.0;
+    causticPower = 1.0;
+
+    p_map = NULL;
+
+    Material light;
+    light.alpha = 1.0;
+    light.alphaInv = 1 - light.alpha;
+    light.beta = 0.0;
+    light.color = vec3(1.0,1.0,1.0);
+    light.refractionIndex = 0;
+    m_materials[ "#light" ] = light;
 
 }
 
@@ -74,6 +91,14 @@ RayTracer::~RayTracer(){
     for ( int i = 0; i < m_scene.objects.size() ; i ++){
         delete m_scene.objects[i];
     }
+
+    delete [] indirectColor;
+    delete [] directColor;
+    delete [] reflectColor;
+    delete [] causticColor;
+
+    if (p_map != NULL ){ delete p_map; }
+
 }
 
 void RayTracer::threadedTrace( RGBImage & img, int threadID ){
@@ -98,8 +123,13 @@ void RayTracer::threadedTrace( RGBImage & img, int threadID ){
  */
 void RayTracer::trace(RGBImage & img){
 
+    indirectColor = new vec3[ m_scene.view.ncols * m_scene.view.nrows];
+    directColor = new vec3[ m_scene.view.ncols * m_scene.view.nrows];
+    reflectColor = new vec3[ m_scene.view.ncols * m_scene.view.nrows];
+    causticColor = new vec3[ m_scene.view.ncols * m_scene.view.nrows];
+
     //
-    if (get_indirect || get_direct || get_caustic){
+    if ( (get_indirect || get_direct || get_caustic ) && p_map != NULL ){
         cout << "Starting Photon Mapping " << endl;
         getPhotonMap();
         cout << "Finished Photon Mapping" << endl;
@@ -152,9 +182,11 @@ vec3 RayTracer::tracePixel( float i, float j ){
     viewRay.direction = pixel_position - viewRay.origin;
     viewRay.direction.normalize();
 
-    return traceOnce( viewRay , -1 , 0 );
+    if (get_monteCarlo ){ return monteCarloTrace( viewRay , -1 , 0, 1.0, i, j ); }
+    return traceOnce( viewRay , -1 , 0, i, j );
 
 }
+
 
 /* traceOnce -  Recursive helper function that takes in an incidentRay
  *              and the current shape index of the ray.
@@ -162,7 +194,8 @@ vec3 RayTracer::tracePixel( float i, float j ){
  *              This returns a color based on the phong lighting model, 
  *              reflection, and transmission.
  */
-vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
+vec3 RayTracer::traceOnce(const Ray & incidentRay, int shapeIndex, int depth
+                          , int row, int col){
 
     //if the recursion depth has been maxed, then return the bg color
     if (depth > maxDepth ){ return m_scene.view.background ; }
@@ -181,6 +214,8 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
 
     // get the current object    
     Shape * collidedObject = m_scene.objects[ shapeIndex ];
+    //if the collided object is a light, return a perfect bright.
+    if (collidedObject->isLight ){ return vec3( 1, 1, 1);}
     Material mat = collidedObject->material;
 
     //get the normal to calculate phong, reflection, and transmission
@@ -189,11 +224,15 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
     if ( incidentRay.isInsideObject ){ normal *= -1; }
 
     vec3 directLight(0,0,0)   , reflectedLight(0,0,0);
-    vec3 indirectLight(0,0,0) , castLight(0,0,0);
+    vec3 indirectLight(0,0,0) , causticLight( 0, 0, 0);
 
-
+    //get the lighting through direct lighting from the light or by raycasting
+    //with the photon map.
     if (get_direct){
-        int shadowVal = p_map.isInShadow( hitPoint );
+        int shadowVal = 0;
+        if ( p_map != NULL ){
+            shadowVal = p_map->isInShadow( hitPoint );
+        }
 
         //if the point is not totally in shadows, continue with the 
         //direct lighting calculations
@@ -212,28 +251,138 @@ vec3 RayTracer::traceOnce( const Ray & incidentRay, int shapeIndex, int depth ){
             }
         }
     }
+    else if ( get_raycast && p_map != NULL ){
+        directLight = rayCast( incidentRay.direction, normal, hitPoint, mat );
+    }
 
+    //get other forms of lighting
     if ( get_reflect ){
         reflectedLight = reflect(incidentRay, hitPoint, normal,
                                   mat, shapeIndex, depth );
-    }
-    if ( get_indirect ){
-        indirectLight = p_map.getIllumination( hitPoint, 
-                                          incidentRay.direction,
-                                          normal,
-                                          mat );
-    }
-    if (get_raycast && depth == 0){
-        castLight = rayCast(incidentRay.direction, hitPoint, 
-                            normal, mat, shapeIndex, depth );
-    }
-    if ( get_reflect && get_direct ){
         float reflected_to_local = sqrt( mat.alpha );
         directLight *= reflected_to_local;
         reflectedLight *= (1 - reflected_to_local);
     }
+    if ( get_indirect && p_map != NULL ){
+        indirectLight = p_map->getIllumination( hitPoint, incidentRay.direction,
+                                                normal, mat, "indirect");
+    }
+    if ( get_caustic && p_map != NULL ){
+        causticLight = p_map->getIllumination( hitPoint, incidentRay.direction,
+                                                normal, mat, "caustic");
+    }
+    if(depth == 0 ){
+        directColor[ row * m_scene.view.ncols + col ] = directLight;
+        causticColor[ row * m_scene.view.ncols + col ] = causticLight;
+        reflectColor[ row * m_scene.view.ncols + col ] = reflectedLight;
+        indirectColor[ row * m_scene.view.ncols + col] = indirectLight;
+    }
+    return directLight + reflectedLight + indirectLight ;
+}
 
-    return directLight + reflectedLight + castLight + indirectLight ;
+vec3 RayTracer::monteCarloTrace( const Ray & incidentRay,
+                                 int shapeIndex, int depth, float strength,
+                                 int row, int col  ){
+
+
+    //the point of intersection with an object
+    vec3 hitPoint, totalColor, reflected, transmitted, caustic;                              
+    //get the closest colliding shape and set the hitpoint
+    shapeIndex = m_scene.checkIntersection( incidentRay, shapeIndex, hitPoint);
+
+    //return if there is no intersection
+    if (shapeIndex < 0 ){
+        return m_scene.view.background;
+    }
+
+    // get the current object    
+    Shape * collidedObject = m_scene.objects[ shapeIndex ];
+
+    Material mat = collidedObject->material;
+
+    //get the normal to calculate phong, reflection, and transmission
+    vec3 normal = collidedObject->normal( hitPoint );
+    //reverse the direction of the normal if the vector is going the wrong way.
+    if ( incidentRay.isInsideObject ){ normal *= -1; }
+    
+    //if the recursion depth has been maxed, then perform the final gathering
+
+    if (depth == maxDepth || strength < 0.075 ){ 
+        return p_map->getIllumination( hitPoint, incidentRay.direction,
+                                                normal, mat, "indirect"); 
+    }
+
+    float reflectance = 1.0;
+    if ( mat.refractionIndex > 0.0 ){
+        transmitted = monteCarloTransmit( incidentRay, hitPoint, normal,
+                                  mat, shapeIndex, depth, strength, reflectance ); 
+    }
+
+    int cast = num_raycast * imin( sqrt( strength ), 1 );
+
+    for( int i = 0; i < cast; i ++){
+        vec3 direction = cosWeightedRandomHemisphereDirection( normal );
+        Ray castRay( hitPoint, direction );
+        float brdfVal = mat.getBRDF( direction, incidentRay.direction, normal );
+
+        //change this to be more dynamic
+        vec3 color = monteCarloTrace( castRay, shapeIndex, depth + 1,
+                                      brdfVal * strength * reflectance );
+        reflected += color * brdfVal;
+    }
+    reflected *= mat.color;
+    reflected /= cast;
+    caustic = p_map->getIllumination( hitPoint, incidentRay.direction,
+                                                 normal, mat, "caustic");
+    
+    totalColor = reflected + caustic + transmitted;
+
+    if(depth == 0 ){
+        directColor[ row * m_scene.view.ncols + col ] = totalColor;
+    }
+
+    return totalColor;
+}
+
+//TODO use importance sampling for the phong model.
+vec3 RayTracer::monteCarloTransmit(  const Ray & incidentRay,
+                                    const vec3 & hitPoint,
+                                    const vec3 & normal,
+                                     const Material & mat,
+                                     int shapeIndex,
+                                    int depth,
+                                    float strength,
+                                    float & reflectance ){
+
+    vec3 transmittedLight( 0,0,0 );
+
+    float n1, n2; 
+    if (incidentRay.isInsideObject){
+        n1 = mat.refractionIndex;
+        n2 = 1.0;
+    }else {
+        n1 = 1.0;
+        n2 = mat.refractionIndex;
+    }
+
+    Ray transmissionRay;
+    transmissionRay.direction = cs40::transmit( incidentRay.direction,
+                                                 normal, n1, n2);
+    transmissionRay.origin = hitPoint;
+    transmissionRay.isInsideObject = !( incidentRay.isInsideObject );
+
+    reflectance = cs40::fresnel( incidentRay.direction, normal, 
+                                       n1, n2);
+
+    //if the transmit was invalid, do not process the transmission
+    if ( transmissionRay.direction.x() < 2 ){
+        transmittedLight = monteCarloTrace( transmissionRay,
+                                            shapeIndex, depth + 1,
+                                            strength * (1 - reflectance) );
+    }
+
+    return transmittedLight * ( 1 - reflectance ) * mat.color;
+
 }
 
 //TODO use importance sampling for the phong model.
@@ -300,27 +449,46 @@ vec3 RayTracer::reflect(  const Ray & incidentRay,
 
 //TODO use importance sampling for the phong model.
 vec3 RayTracer::rayCast( const vec3 & view,
-                         const vec3 & hitPoint,
                          const vec3 & normal,
-                         const Material & mat,
-                         int shapeIndex,
-                         int depth ){
+                         const vec3 & hitPoint,
+                         const Material & mat){
 
-    vec3 direction, color, indirect;
+    vec3 totalColor;
 
-    int num_samples = 100;
-    for( int i = 0; i < num_samples; i ++){
+    for( int i = 0; i < num_raycast; i ++){
+        vec3 color, direction, newHitPoint, newNormal;
+        int shapeIndex;
+
         direction = cosWeightedRandomHemisphereDirection( normal );
         Ray castRay( hitPoint, direction );
 
-        //change this to be more dynamic
-        color = traceOnce( castRay, shapeIndex, maxDepth - 1 );
-        color *= mat.getLight( direction, view, normal );
-        indirect += color;
-    }
-    indirect /= num_samples;
+        //get the point of intersection with an object
+        shapeIndex = m_scene.checkIntersection( castRay, shapeIndex, newHitPoint);
 
-    return indirect;
+        //return if there is no intersection
+        if (shapeIndex < 0 ){ continue; }
+
+        // get the current object    
+        Shape * collidedObject = m_scene.objects[ shapeIndex ];
+        Material newMat = collidedObject->material;
+
+        //get the normal to calculate phong, reflection, and transmission
+        newNormal = collidedObject->normal( newHitPoint );
+
+        //reverse the direction of the normal if the vector is going the wrong way.
+        if ( castRay.isInsideObject ){ newNormal *= -1; }
+
+        color = p_map->getIllumination( newHitPoint, castRay.direction,
+                                        newNormal, newMat, "indirect"); 
+
+        //change this to be more dynamic
+        color *= mat.getLight( direction, view, normal );
+        totalColor += color;
+    }
+
+    totalColor /= num_raycast;
+
+    return totalColor;
 }
 
 
@@ -334,7 +502,6 @@ void RayTracer::save(){
     img.saveAs(m_scene.view.fname, true);
     cout << "Saved result to " << m_scene.view.fname << endl;
 }
-
 
 /* convert from 0-1 rgb space to 0-255 */
 RGBColor RayTracer::convertColor( vec3& clr){
@@ -399,7 +566,16 @@ void RayTracer::parseLine(const vector<string>& words){
     else if (cmd == "raycast"){
         get_raycast = true;
         cout << "RayCasting On" << "\n";
+        num_raycast = parseInt( words[1] );
+        if ( num_raycast == 0 ){ num_raycast = 100; }
     }
+    else if (cmd == "montecarlo"){
+        get_monteCarlo = true;
+        cout << "MonteCarlo Tracing On" << "\n";
+        num_raycast = parseInt( words[1] );
+        if ( num_raycast == 0 ){ num_raycast = 100; }
+    }
+
     else if (cmd == "reflect"){
         get_reflect = true;
         cout << "Reflection On" << "\n";        
@@ -425,6 +601,10 @@ void RayTracer::parseLine(const vector<string>& words){
     else if (cmd == "background"){
         checksize(words,3);
         m_scene.view.background = parseVec3(words,1);
+    }
+    else if (cmd == "depth" ){
+        checksize(words,1);        
+        maxDepth = parseInt( words[1] );
     }
     else if (cmd == "color"){
         checksize(words,4);
@@ -486,35 +666,48 @@ void RayTracer::parseLine(const vector<string>& words){
     }
     else if ( cmd == "photon" ){
         checksize( words, 3 );
-        cs40::PhotonMapper p_map (  parseInt( words[1] ),
-                                    parseInt( words[2] ),
-                                    parseInt( words[3] )  );
+        int indirect, caustic, shadow;
+        indirect = parseInt( words[1] );
+        caustic = parseInt( words[2] );
+        shadow  = parseInt( words[3] );
+
+        cout << "Indirect: " << indirect << endl;
+
+        p_map = new  cs40::PhotonMapper(  indirect, caustic, shadow );
+
+        if (indirect > 0 ){get_indirect = true; }
+        else { get_indirect = false; }
+
+        if (caustic > 0 ){ get_caustic = true; }
+        else { get_caustic = false; }
+
     }
     else if ( cmd == "photon_power" ){
         checksize( words, 1 );
-        p_map.photon_power = parseFloat( words[1] );
+        p_map->photon_power = parseFloat( words[1] );
     }
     else if( cmd == "photon_N" ){
         checksize( words, 3 );
-        p_map.shadow.N    = parseInt( words[1] );
-        p_map.caustic.N   = parseInt( words[2] );
-        p_map.indirect.N  = parseInt( words[3] );
+        p_map->indirect.N  = parseInt( words[1] );        
+        p_map->caustic.N   = parseInt( words[2] );
+        p_map->shadow.N    = parseInt( words[3] );
+        
     }
     else if( cmd == "photon_visualize" ){
-        p_map.visualize = true;
+        p_map->visualize = true;
     }
     else if( cmd == "photon_exclude_direct" ){
-        p_map.exclude_direct = true;
+        p_map->exclude_direct = true;
     }
     else if( cmd == "photon_include_direct" ){
-        p_map.exclude_direct = false;
+        p_map->exclude_direct = false;
     }
 
     else if( cmd == "photon_epsilon" ){
         checksize( words, 3 );
-        p_map.shadow.epsilon    = parseFloat( words[1] );
-        p_map.caustic.epsilon   = parseFloat( words[2] );
-        p_map.indirect.epsilon  = parseFloat( words[3] );
+        p_map->indirect.epsilon  = parseFloat( words[1] );
+        p_map->caustic.epsilon   = parseFloat( words[2] );
+        p_map->shadow.epsilon    = parseFloat( words[3] );
     }
     else{
         throw parser_error("Unknown command: "+cmd);
@@ -543,6 +736,11 @@ void RayTracer::parseLight(const vector<string>& words){
         
         Light light( ll, ul, ur, intensity, RECTANGLE );
         m_scene.lights.push_back( light );
+
+        Rectangle* object = new Rectangle(ll, ul, ur, m_materials["#light"]);
+        object->isLight = true;
+        m_scene.objects.push_back( object );
+        
     }
     else if ( words[1] == "triangle"){
 
@@ -553,15 +751,10 @@ void RayTracer::parseLight(const vector<string>& words){
         
         Light light( ll, ul, ur, intensity, TRIANGLE );
         m_scene.lights.push_back( light );
-        
-    }
-    else if ( words[1] == "circle"){
 
-        vec3 position = parseVec3( words, 3 );
-        float radius = parseFloat( words[6] );
-        vec3 normal  = parseVec3( words, 7 );
-        Light light( position, intensity, radius, normal, CIRCLE );
-        m_scene.lights.push_back( light );
+        Triangle* object = new Triangle(ll, ul, ur, m_materials["#light"]);
+        object->isLight = true;
+        m_scene.objects.push_back( object );
         
     }
     else if ( words[1] == "sphere"){
@@ -570,6 +763,10 @@ void RayTracer::parseLight(const vector<string>& words){
         Light light( position, intensity, radius, SPHERE );
         m_scene.lights.push_back( light );
         
+        Sphere* object = new Sphere(position, radius,  m_materials["#light"]);
+        object->isLight = true;
+        m_scene.objects.push_back( object );
+
     }
     else{
         throw parser_error("No command found for light");
@@ -617,11 +814,78 @@ void RayTracer::parseMat(const vector<string>& words){
 
 void RayTracer::getPhotonMap(){
     m_scene.createLightMapping();
-    p_map.num_threads = num_threads;
-    p_map.mapScene( m_scene );
-
+    p_map->num_threads = num_threads;
+    p_map->mapScene( m_scene );
 }
 
+void RayTracer::getCommandLineArgs(){
+    while (true){
+        string str;
+        float subcmd;
+        cout << "Waiting for command\n";
+        cin >> str;
+        if( str == "indirect" || str == "i" || str == "I"){
+            cin >> subcmd;
+            cout << "Multiplying the indirect lighting by " << subcmd << "\n";
+            indirectPower = subcmd;
+            sumAndSave();
+        }
+        else if( str == "direct" || str == "d" || str == "D"){
+            cin >> subcmd;
+            cout << "Multiplying the direct lighting by " << subcmd << "\n";
+            directPower = subcmd;
+            sumAndSave();
+        }
+        else if( str == "reflect" || str == "r" || str == "R"){
+            cin >> subcmd;
+            cout << "Multiplying the reflect lighting by " << subcmd << "\n";
+            reflectPower = subcmd;
+            sumAndSave();
+        }
+        else if( str == "caustic" || str == "c" || str == "C"){
+            cin >> subcmd;
+            cout << "Multiplying the caustic lighting by " << subcmd << "\n";
+            causticPower = subcmd;
+            sumAndSave();
+
+        }
+        else if( str == "quit" || str == "exit"
+                 || str == "q" || str == "e"   ){
+            cout << "\nExiting\n";
+            break;
+        }
+        else{
+            cout << "\nUnknown input: doing nothing.\n";
+        }
+    }
+}
+
+
+void RayTracer::sumAndSave(){
+    RGBImage img(m_scene.view.nrows,
+                 m_scene.view.ncols,
+                 convertColor( m_scene.view.background ) );
+
+    int width = m_scene.view.nrows;
+    int height = m_scene.view.ncols;
+
+    for ( int i = 0; i < width; i ++ ){
+        for ( int j = 0; j < height; j ++){
+            vec3 color(0,0,0);            
+            color += directColor[   i*width + j ] * directPower;
+            if (!get_monteCarlo ){
+                color += causticColor[  i*width + j ] * causticPower;
+                color += reflectColor[  i*width + j ] * reflectPower;
+                color += indirectColor[ i*width + j ] * indirectPower;
+            }
+            img( m_scene.view.nrows - int(j) - 1, int(i) ) =
+                                        convertColor( color );
+        }
+    }
+
+    img.saveAs(m_scene.view.fname, true);
+    cout << "Saved result to " << m_scene.view.fname << endl;
+}
 
 /*
 void RayTracer::loadModel( char * objectFile )

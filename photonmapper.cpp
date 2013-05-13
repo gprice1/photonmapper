@@ -19,13 +19,11 @@ using cs40::IlluminationMap;
 using cs40::Scene;
 using cs40::Ray;
 
-PhotonMapper::PhotonMapper() : shadow(0), caustic( 100000 ), indirect( 0 ){
+PhotonMapper::PhotonMapper() : shadow(0), caustic( 1000 ), indirect( 0 ){
     caustic.N = 100;
     indirect.N = 1;
     shadow.N = 10;
     range = 0.01;
-
-    photon_power = 10000;
 
     print = true;
     visualize = false;
@@ -34,15 +32,15 @@ PhotonMapper::PhotonMapper() : shadow(0), caustic( 100000 ), indirect( 0 ){
     //if they have not been reflected in some way first.
     exclude_direct = false;
 }
-PhotonMapper::PhotonMapper( int num_shadow, int num_caustic, int num_indirect ) :
+PhotonMapper::PhotonMapper( int num_indirect, int num_caustic, int num_shadow ) :
     shadow( num_shadow ) , caustic( num_caustic ), indirect( num_indirect ){
 
-    caustic.N = 0;
-    indirect.N = 0;
+    caustic.N = 10;
+    indirect.N = 10;
     shadow.N = 0;
     range = 0.01;
 
-    photon_power = 0;
+    photon_power = 1;
 
     print = true;
     visualize = false;
@@ -50,6 +48,8 @@ PhotonMapper::PhotonMapper( int num_shadow, int num_caustic, int num_indirect ) 
     //if this value is set to true, then the photon map will not store photons
     //if they have not been reflected in some way first.
     exclude_direct = false;
+
+    num_threads = 1;
 }
 
 
@@ -59,6 +59,7 @@ PhotonMapper::~PhotonMapper(){
         
             
 void PhotonMapper::mapScene( const Scene &scene ){
+    cout << "Caustic: " << caustic.total << endl;
     if ( num_threads > 1 ){
 
         initThread();
@@ -186,10 +187,10 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         vec3 normal = shape->normal( hitPoint );
         incidentRay.origin = hitPoint;
 
-        //the photon will either be reflected or absorbed
-        //right now I am using the darkness and lightness of a material to determine
-        //absorbtion. Furthermore, the more similar that the colors are, the more 
-        //likely that reflection will occur.
+        // the photon will either be reflected or absorbed right now I am
+        // using the darkness and lightness of a material to determine
+        // absorbtion. Furthermore, the more similar that the colors are, the more 
+        // likely that reflection will occur.
         float absorbtionValue = incidentColor.dotProduct( mat.color, incidentColor)
                                 / incidentColor.length();
 
@@ -269,9 +270,13 @@ void PhotonMapper::tracePhoton(const Scene &scene ,
         }
         //if no reflections occur, then return.
         else{
-            break;
+            return;
         }
+
         incidentColor *= mat.color;
+        if (incidentColor.lengthSquared() > 3 ){
+            cout << "Incident Color" << incidentColor;
+        }
     }
 }
 
@@ -283,7 +288,7 @@ vec3 PhotonMapper::visualizePhotons( const vec3 & point , float clearance){
     std::vector<KDTree::kd_neighbour> neighbours;
     
     if ( indirect.total > 0 ){
-        indirect.tree.knn( p , 1 , neighbours, caustic.epsilon );
+        indirect.tree.knn( p , 1 , neighbours, indirect.epsilon );
     
         if ( neighbours[0].squared_distance < clearance ){
             return indirect.photons[ neighbours[0].index ]->color;
@@ -307,17 +312,19 @@ vec3 PhotonMapper::visualizePhotons( const vec3 & point , float clearance){
 vec3 PhotonMapper::getIllumination( const vec3 & point,
                                     const vec3 & incident,
                                     const vec3 & normal,
-                                    const Material & mat ){
+                                    const Material & mat, 
+                                    const string tag){
     //if the visualize flag is set to true, then use the visualize photons function
     //for the illumination.
     if ( visualize ){
         return visualizePhotons( point, range );
     }
+    
+    if (tag == "caustic" ){
+        return caustic.getColor( point, incident, normal, mat ) * photon_power;
+    }
 
-    vec3 causticColor = caustic.getColor( point, incident, normal, mat );
-    vec3 indirectColor = indirect.getColor( point, incident, normal, mat );
-
-    return (indirectColor + causticColor) * photon_power;
+    return indirect.getColor( point, incident, normal, mat ) * photon_power;
 
 }
 
